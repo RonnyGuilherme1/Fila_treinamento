@@ -3,15 +3,43 @@ const cors = require("cors");
 const { Pool } = require("pg");
 
 const app = express();
-app.use(
-  cors({
-    origin: "*",
-  }),
-);
+
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-// 🔥 CONFIG DO BANCO
 const pool = require("./db");
+
+// =============================
+// 🚀 DASHBOARD (NOVO - OTIMIZADO)
+// =============================
+app.get("/dashboard", async (req, res) => {
+  try {
+    const [
+      filaTreinamento,
+      filaManutencao,
+      atendimento,
+      historicoTreinamento,
+      historicoManutencao,
+    ] = await Promise.all([
+      pool.query("SELECT * FROM fila_treinamento ORDER BY posicao"),
+      pool.query("SELECT * FROM fila_manutencao ORDER BY posicao"),
+      pool.query("SELECT * FROM atendimento_atual LIMIT 1"),
+      pool.query("SELECT * FROM historico_treinamento ORDER BY id DESC"),
+      pool.query("SELECT * FROM historico_manutencao ORDER BY id DESC"),
+    ]);
+
+    res.json({
+      fila: filaTreinamento.rows,
+      filaManut: filaManutencao.rows,
+      atual: atendimento.rows[0] || null,
+      historico: historicoTreinamento.rows,
+      historicoManut: historicoManutencao.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Erro dashboard");
+  }
+});
 
 // =============================
 // 🔹 FILA TREINAMENTO
@@ -85,16 +113,6 @@ app.post("/pular", async (req, res) => {
 });
 
 // =============================
-// 🔹 HISTÓRICO
-// =============================
-app.get("/historico/treinamento", async (req, res) => {
-  const result = await pool.query(
-    "SELECT * FROM historico_treinamento ORDER BY id DESC",
-  );
-  res.json(result.rows);
-});
-
-// =============================
 // 🔹 FILA MANUTENÇÃO
 // =============================
 app.get("/fila/manutencao", async (req, res) => {
@@ -112,7 +130,6 @@ app.post("/fila/manutencao/rotacionar", async (req, res) => {
   const primeira = result.rows[0];
 
   await pool.query("UPDATE fila_manutencao SET posicao = posicao - 1");
-
   await pool.query(
     "UPDATE fila_manutencao SET posicao = (SELECT MAX(posicao)+1 FROM fila_manutencao) WHERE id=$1",
     [primeira.id],
@@ -136,16 +153,5 @@ app.post("/manutencao", async (req, res) => {
 });
 
 // =============================
-// 🔹 HISTÓRICO MANUTENÇÃO
-// =============================
-app.get("/historico/manutencao", async (req, res) => {
-  const result = await pool.query(
-    "SELECT * FROM historico_manutencao ORDER BY id DESC",
-  );
-  res.json(result.rows);
-});
-
-// =============================
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => console.log("API rodando na porta " + PORT));

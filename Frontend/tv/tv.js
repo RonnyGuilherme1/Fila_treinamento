@@ -2,18 +2,15 @@ const API = "https://fila-treinamento.onrender.com";
 
 async function atualizarTV() {
   try {
-    const [filaTreinamento, filaManutencao, at, historico] = await Promise.all([
-      fetch(`${API}/fila/treinamento`).then((r) => r.json()),
-      fetch(`${API}/fila/manutencao`).then((r) => r.json()),
-      fetch(`${API}/atendimento`).then((r) => r.json()),
-      fetch(`${API}/historico/treinamento`).then((r) => r.json()),
-    ]);
+    const data = await fetch(`${API}/dashboard`).then((r) => r.json());
+
+    const { filaTreinamento, filaManutencao, atendimento, historico } = data;
 
     // =============================
     // ATUAL
     // =============================
-    document.getElementById("tv-atual").innerText = at
-      ? `${at.pessoa} → ${at.cliente}`
+    document.getElementById("tv-atual").innerText = atendimento
+      ? `${atendimento.pessoa} → ${atendimento.cliente}`
       : "-";
 
     // =============================
@@ -50,7 +47,7 @@ async function atualizarTV() {
     r.innerHTML = "";
 
     Object.entries(ranking)
-      .sort((a, b) => b[1] - a[1]) // maior primeiro
+      .sort((a, b) => b[1] - a[1])
       .forEach(([nome, total]) => {
         r.innerHTML += `
           <tr>
@@ -64,6 +61,5 @@ async function atualizarTV() {
   }
 }
 
-// INIT
 atualizarTV();
 setInterval(atualizarTV, 3000);
