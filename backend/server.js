@@ -3,7 +3,11 @@ const cors = require("cors");
 const { Pool } = require("pg");
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+  }),
+);
 app.use(express.json());
 
 // 🔥 CONFIG DO BANCO
@@ -142,4 +146,6 @@ app.get("/historico/manutencao", async (req, res) => {
 });
 
 // =============================
-app.listen(3000, () => console.log("API rodando na porta 3000"));
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => console.log("API rodando na porta " + PORT));
