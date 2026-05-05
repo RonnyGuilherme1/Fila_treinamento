@@ -18,6 +18,10 @@ async function atualizarTV() {
 
     const at = await fetch(`${API}/atendimento`).then((r) => r.json());
 
+    const historico = await fetch(`${API}/historico/treinamento`).then((r) =>
+      r.json(),
+    );
+
     // =============================
     // ATUAL
     // =============================
@@ -47,6 +51,23 @@ async function atualizarTV() {
   } catch (err) {
     console.error("Erro TV:", err);
   }
+  const ranking = {};
+  historico.forEach((h) => {
+    if (!ranking[h.pessoa]) ranking[h.pessoa] = 0;
+    ranking[h.pessoa]++;
+  });
+
+  const r = document.getElementById("tv-ranking");
+  r.innerHTML = "";
+
+  Object.entries(ranking).forEach(([nome, total]) => {
+    r.innerHTML += `
+    <tr>
+      <td>${nome}</td>
+      <td>${total}</td>
+    </tr>
+  `;
+  });
 }
 
 // =============================
