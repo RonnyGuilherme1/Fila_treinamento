@@ -29,13 +29,19 @@ async function chamarTreinamento() {
 }
 
 async function finalizarAtendimento(id) {
-  await fetch(`${API}/atendimento/finalizar`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id }),
-  });
+  try {
+    console.log("Finalizando:", id);
 
-  atualizar();
+    await fetch(`${API}/atendimento/finalizar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+
+    atualizar();
+  } catch (err) {
+    console.error("Erro finalizar:", err);
+  }
 }
 
 async function atualizar() {
@@ -57,10 +63,10 @@ async function atualizar() {
       ? atendimentos
           .map(
             (a) => `
-          <div onclick="finalizarAtendimento(${a.id})">
-            ${a.pessoa} → ${a.cliente}
-          </div>
-        `,
+        <div onclick="finalizarAtendimento(${a.id})">
+          ${a.pessoa} → ${a.cliente}
+        </div>
+      `,
           )
           .join("")
       : "-";

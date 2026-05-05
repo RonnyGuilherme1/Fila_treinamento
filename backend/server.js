@@ -70,7 +70,7 @@ app.post("/fila/treinamento/rotacionar", async (req, res) => {
 });
 
 // =============================
-// ATENDIMENTO
+// ATENDIMENTO (CORRIGIDO)
 // =============================
 app.post("/atendimento", async (req, res) => {
   const { pessoa, cliente } = req.body;
@@ -80,18 +80,44 @@ app.post("/atendimento", async (req, res) => {
     [pessoa, cliente],
   );
 
-  res.json(r.rows[0]);
+  const atendimento = r.rows[0];
+
+  // 🔥 CRIA HISTÓRICO COM INÍCIO
+  await pool.query(
+    `INSERT INTO historico_treinamento
+    (pessoa, cliente, tipo, motivo, data_inicio)
+    VALUES ($1,$2,'Atendimento','-',NOW())`,
+    [pessoa, cliente],
+  );
+
+  res.json(atendimento);
 });
 
-// FINALIZAR
+// =============================
+// FINALIZAR (CORRIGIDO)
+// =============================
 app.post("/atendimento/finalizar", async (req, res) => {
   const { id } = req.body;
 
-  await pool.query("UPDATE atendimentos SET fim = NOW() WHERE id = $1", [id]);
+  const r = await pool.query(
+    "UPDATE atendimentos SET fim = NOW() WHERE id = $1 RETURNING *",
+    [id],
+  );
+
+  const att = r.rows[0];
+
+  if (att) {
+    // 🔥 atualiza histórico correspondente
+    await pool.query(
+      `UPDATE historico_treinamento
+       SET data_fim = NOW()
+       WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL`,
+      [att.pessoa, att.cliente],
+    );
+  }
 
   res.send("ok");
 });
-
 // LISTAR ATIVOS
 app.get("/atendimento", async (req, res) => {
   const r = await pool.query(
