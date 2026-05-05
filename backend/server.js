@@ -68,34 +68,53 @@ app.post("/fila/treinamento/rotacionar", async (req, res) => {
 });
 
 // =============================
-// 🔹 ATENDIMENTO
+// 🔹 ATENDIMENTOS (NOVO MODELO)
 // =============================
+
+// ▶️ INICIAR ATENDIMENTO
 app.post("/atendimento", async (req, res) => {
   const { pessoa, cliente } = req.body;
 
-  await pool.query("DELETE FROM atendimento_atual");
-
-  await pool.query(
-    "INSERT INTO atendimento_atual (pessoa, cliente) VALUES ($1,$2)",
+  const result = await pool.query(
+    "INSERT INTO atendimentos (pessoa, cliente) VALUES ($1,$2) RETURNING *",
     [pessoa, cliente],
   );
 
   await pool.query(
-    "INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo) VALUES ($1,$2,'Atendimento','-')",
+    "INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio) VALUES ($1,$2,'Atendimento','-',NOW())",
     [pessoa, cliente],
+  );
+
+  res.json(result.rows[0]);
+});
+
+// 🛑 FINALIZAR ATENDIMENTO ESPECÍFICO
+app.post("/atendimento/finalizar", async (req, res) => {
+  const { id } = req.body;
+
+  const result = await pool.query(
+    "UPDATE atendimentos SET fim = NOW() WHERE id = $1 RETURNING *",
+    [id],
+  );
+
+  // atualiza histórico com fim
+  await pool.query(
+    `UPDATE historico_treinamento
+     SET data_fim = NOW()
+     WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL`,
+    [result.rows[0].pessoa, result.rows[0].cliente],
   );
 
   res.send("ok");
 });
 
+// 📥 LISTAR ATIVOS
 app.get("/atendimento", async (req, res) => {
-  const result = await pool.query("SELECT * FROM atendimento_atual LIMIT 1");
-  res.json(result.rows[0] || null);
-});
+  const result = await pool.query(
+    "SELECT * FROM atendimentos WHERE fim IS NULL ORDER BY id DESC",
+  );
 
-app.delete("/atendimento", async (req, res) => {
-  await pool.query("DELETE FROM atendimento_atual");
-  res.send("ok");
+  res.json(result.rows);
 });
 
 // =============================

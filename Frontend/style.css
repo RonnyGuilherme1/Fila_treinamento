@@ -145,3 +145,85 @@ td {
 .aba.ativa {
   display: block;
 }
+
+/* =========================
+   🔥 ANIMAÇÕES UX PRO
+========================= */
+
+/* BOTÕES CLICK FEEDBACK */
+button {
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+button:active {
+  transform: scale(0.96);
+  filter: brightness(0.9);
+}
+
+/* ENTRADA SUAVE DE ELEMENTOS */
+li,
+tr,
+.card {
+  animation: fadeInUp 0.25s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* RANKING PODIUM */
+#ranking tr:nth-child(1),
+#tv-ranking tr:nth-child(1) {
+  background: gold;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+#ranking tr:nth-child(2),
+#tv-ranking tr:nth-child(2) {
+  background: silver;
+}
+
+#ranking tr:nth-child(3),
+#tv-ranking tr:nth-child(3) {
+  background: #cd7f32;
+}
+
+/* destaque suave ao atualizar */
+#ranking tr,
+#tv-ranking tr {
+  transition: all 0.3s ease;
+}
+
+/* FILA ANIMAÇÃO MELHORADA */
+ul li {
+  transition: all 0.2s ease;
+}
+
+ul li:hover {
+  transform: translateX(3px);
+  background: #eaf7ef;
+}
+
+.at-item {
+  background: #e8f5e9;
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.at-item:hover {
+  transform: scale(1.02);
+  background: #00c853;
+  color: white;
+}

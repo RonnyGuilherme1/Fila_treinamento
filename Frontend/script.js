@@ -1,3 +1,6 @@
+// =============================
+// 🌐 CONFIG API
+// =============================
 const API =
   window.location.hostname === "localhost"
     ? "http://localhost:3000"
@@ -10,6 +13,7 @@ function trocarAba(nome) {
   document
     .querySelectorAll(".aba")
     .forEach((sec) => sec.classList.remove("ativa"));
+
   document.getElementById(nome).classList.add("ativa");
 
   document.getElementById("titulo").innerText =
@@ -34,16 +38,23 @@ async function chamarTreinamento() {
     body: JSON.stringify({ pessoa, cliente }),
   });
 
-  await fetch(`${API}/fila/treinamento/rotacionar`, { method: "POST" });
+  await fetch(`${API}/fila/treinamento/rotacionar`, {
+    method: "POST",
+  });
 
   atualizar();
 }
 
 // =============================
-// ⏹ FINALIZAR
+// 🛑 FINALIZAR ATENDIMENTO ESPECÍFICO
 // =============================
-async function finalizarAtendimento() {
-  await fetch(`${API}/atendimento`, { method: "DELETE" });
+async function finalizarAtendimento(id) {
+  await fetch(`${API}/atendimento/finalizar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+
   atualizar();
 }
 
@@ -63,7 +74,9 @@ async function pularTreinamento() {
     body: JSON.stringify({ pessoa, motivo }),
   });
 
-  await fetch(`${API}/fila/treinamento/rotacionar`, { method: "POST" });
+  await fetch(`${API}/fila/treinamento/rotacionar`, {
+    method: "POST",
+  });
 
   atualizar();
 }
@@ -84,63 +97,75 @@ async function chamarManutencao() {
     body: JSON.stringify({ pessoa, equipamento }),
   });
 
-  await fetch(`${API}/fila/manutencao/rotacionar`, { method: "POST" });
+  await fetch(`${API}/fila/manutencao/rotacionar`, {
+    method: "POST",
+  });
 
   atualizar();
 }
 
 // =============================
-// 🚀 ATUALIZAÇÃO (AGORA COM /dashboard)
+// 🚀 ATUALIZAÇÃO PRINCIPAL
 // =============================
 async function atualizar() {
   const data = await fetch(`${API}/dashboard`).then((r) => r.json());
 
-  const { fila, filaManut, atual, historico, historicoManut } = data;
+  const { fila, filaManut, historico, historicoManut } = data;
+
+  const atendimentos = await fetch(`${API}/atendimento`).then((r) => r.json());
 
   // =============================
-  // ATUAL
+  // ATENDIMENTOS MULTI
   // =============================
-  document.getElementById("atendendoAgora").innerText = atual
-    ? `${atual.pessoa} → ${atual.cliente}`
+  const box = document.getElementById("atendendoAgora");
+
+  box.innerHTML = atendimentos.length
+    ? atendimentos
+        .map(
+          (a) => `
+          <div class="at-item" onclick="finalizarAtendimento(${a.id})">
+            ${a.pessoa} → ${a.cliente}
+          </div>
+        `,
+        )
+        .join("")
     : "-";
 
   // =============================
-  // PRÓXIMO
+  // FILA TREINAMENTO
   // =============================
   document.getElementById("proximoTreinamento").innerText =
     fila[0]?.nome || "-";
 
   document.getElementById("totalTreinamento").innerText = fila.length;
 
-  // =============================
-  // FILA TREINAMENTO
-  // =============================
-  const f = document.getElementById("filaTreinamento");
-  f.innerHTML = "";
-  fila.forEach((p, i) => {
-    f.innerHTML += `<li>${i + 1}º - ${p.nome}</li>`;
-  });
+  document.getElementById("filaTreinamento").innerHTML = fila
+    .map((p, i) => `<li>${i + 1}º - ${p.nome}</li>`)
+    .join("");
 
   // =============================
-  // HISTÓRICO TREINAMENTO
+  // HISTÓRICO TREINAMENTO (INÍCIO/FIM)
   // =============================
   const h = document.getElementById("historicoTreinamento");
-  h.innerHTML = "";
 
-  historico.forEach((item) => {
-    h.innerHTML += `
-      <tr>
-        <td>${item.pessoa}</td>
-        <td>${item.cliente}</td>
-        <td>${item.tipo}</td>
-        <td>${item.motivo}</td>
-        <td>${new Date(item.data).toLocaleString()}</td>
-      </tr>
-    `;
-  });
+  h.innerHTML = historico
+    .map((item) => {
+      const inicio = new Date(item.data_inicio || item.data);
+      const fim = item.data_fim ? new Date(item.data_fim) : null;
+
+      return `
+        <tr>
+          <td>${item.pessoa}</td>
+          <td>${item.cliente}</td>
+          <td>${inicio.toLocaleString()}</td>
+          <td>${fim ? fim.toLocaleString() : "Em andamento"}</td>
+        </tr>
+      `;
+    })
+    .join("");
 
   // =============================
-  // RANKING
+  // RANKING (ORDENADO)
   // =============================
   const ranking = {};
 
@@ -149,41 +174,36 @@ async function atualizar() {
     ranking[h.pessoa] = (ranking[h.pessoa] || 0) + 1;
   });
 
-  const r = document.getElementById("ranking");
-  r.innerHTML = "";
-
-  Object.entries(ranking)
+  document.getElementById("ranking").innerHTML = Object.entries(ranking)
     .sort((a, b) => b[1] - a[1])
-    .forEach(([nome, total]) => {
-      r.innerHTML += `
+    .map(
+      ([nome, total]) => `
         <tr>
           <td>${nome}</td>
           <td>${total}</td>
         </tr>
-      `;
-    });
+      `,
+    )
+    .join("");
 
   // =============================
   // MANUTENÇÃO
   // =============================
-  const fm = document.getElementById("filaManutencao");
-  fm.innerHTML = "";
-  filaManut.forEach((p, i) => {
-    fm.innerHTML += `<li>${i + 1}º - ${p.nome}</li>`;
-  });
+  document.getElementById("filaManutencao").innerHTML = filaManut
+    .map((p, i) => `<li>${i + 1}º - ${p.nome}</li>`)
+    .join("");
 
-  const hm = document.getElementById("historicoManutencao");
-  hm.innerHTML = "";
-
-  historicoManut.forEach((item) => {
-    hm.innerHTML += `
-      <tr>
-        <td>${item.pessoa}</td>
-        <td>${item.equipamento}</td>
-        <td>${new Date(item.data).toLocaleString()}</td>
-      </tr>
-    `;
-  });
+  document.getElementById("historicoManutencao").innerHTML = historicoManut
+    .map(
+      (item) => `
+        <tr>
+          <td>${item.pessoa}</td>
+          <td>${item.equipamento}</td>
+          <td>${new Date(item.data).toLocaleString()}</td>
+        </tr>
+      `,
+    )
+    .join("");
 }
 
 // =============================

@@ -44,18 +44,18 @@ async function atualizarTV() {
     });
 
     const r = document.getElementById("tv-ranking");
-    r.innerHTML = "";
 
-    Object.entries(ranking)
+    r.innerHTML = Object.entries(ranking)
       .sort((a, b) => b[1] - a[1])
-      .forEach(([nome, total]) => {
-        r.innerHTML += `
-          <tr>
-            <td>${nome}</td>
-            <td>${total}</td>
-          </tr>
-        `;
-      });
+      .map(
+        ([nome, total], index) => `
+      <tr>
+        <td>${index === 0 ? "🏆 " : ""}${nome}</td>
+        <td>${total}</td>
+      </tr>
+    `,
+      )
+      .join("");
   } catch (err) {
     console.error("Erro TV:", err);
   }
