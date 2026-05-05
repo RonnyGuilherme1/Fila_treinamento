@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Painel TV - Conecta</title>
+    <link rel="stylesheet" href="tv.css" />
+  </head>
+
+  <body class="tv-body">
+    <div class="tv-wrapper">
+      <header class="tv-header">
+        <h1>Conecta • Painel</h1>
+      </header>
+
+      <section class="tv-atual-box">
+        <h2>Atendendo Agora</h2>
+        <div id="tv-atual" class="tv-atual-nome">-</div>
+      </section>
+
+      <section class="tv-filas">
+        <div class="tv-coluna">
+          <h3>Treinamento</h3>
+          <ul id="tv-fila-treinamento"></ul>
+        </div>
+
+        <div class="tv-coluna">
+          <h3>Manutenção</h3>
+          <ul id="tv-fila-manutencao"></ul>
+        </div>
+
+        <div class="tv-coluna">
+          <h3>Ranking</h3>
+          <table class="tv-table">
+            <thead>
+              <tr>
+                <th>Pessoa</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="tv-ranking"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <script src="tv.js"></script>
+  </body>
+</html>

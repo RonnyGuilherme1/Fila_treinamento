@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Conecta - Controle</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <h2>Conecta</h2>
+
+        <button onclick="trocarAba('treinamento')">📚 Treinamento</button>
+        <button onclick="trocarAba('manutencao')">🛠️ Manutenção</button>
+        <button onclick="window.open('tv/tv.html')">📺 Painel TV</button>
+      </aside>
+
+      <main class="content">
+        <h1 id="titulo">Treinamento</h1>
+
+        <!-- TREINAMENTO -->
+        <section id="treinamento" class="aba ativa">
+          <div class="painel-atendimento">
+            <h2>Atendendo agora</h2>
+            <p id="atendendoAgora">-</p>
+          </div>
+
+          <div class="cards">
+            <div class="card">
+              <h3>Próximo</h3>
+              <p id="proximoTreinamento">-</p>
+            </div>
+            <div class="card">
+              <h3>Total</h3>
+              <p id="totalTreinamento">0</p>
+            </div>
+          </div>
+
+          <div class="acao">
+            <input id="clienteTreinamento" placeholder="Cliente" />
+            <button onclick="chamarTreinamento()">Iniciar</button>
+            <button class="warning" onclick="pularTreinamento()">Pular</button>
+            <button class="danger" onclick="finalizarAtendimento()">
+              Finalizar
+            </button>
+          </div>
+
+          <div class="grid">
+            <div class="box">
+              <h3>Fila</h3>
+              <ul id="filaTreinamento"></ul>
+            </div>
+
+            <div class="box">
+              <h3>Histórico</h3>
+              <div class="scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Pessoa</th>
+                      <th>Cliente</th>
+                      <th>Tipo</th>
+                      <th>Motivo</th>
+                      <th>Data</th>
+                    </tr>
+                  </thead>
+                  <tbody id="historicoTreinamento"></tbody>
+                </table>
+              </div>
+
+              <h3>Ranking</h3>
+              <div class="scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Pessoa</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ranking"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- MANUTENÇÃO -->
+        <section id="manutencao" class="aba">
+          <h2>Manutenção</h2>
+
+          <div class="acao">
+            <input id="equipamento" placeholder="N° Equipamento" />
+            <button onclick="chamarManutencao()">Finalizar</button>
+          </div>
+
+          <div class="grid">
+            <div class="box">
+              <h3>Fila</h3>
+              <ul id="filaManutencao"></ul>
+            </div>
+
+            <div class="box">
+              <h3>Histórico</h3>
+              <div class="scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Pessoa</th>
+                      <th>Equipamento</th>
+                      <th>Data</th>
+                    </tr>
+                  </thead>
+                  <tbody id="historicoManutencao"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

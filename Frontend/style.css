@@ -1,0 +1,147 @@
+body {
+  margin: 0;
+  font-family: "Segoe UI";
+  background: #f4f6f9;
+}
+
+.layout {
+  display: flex;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 220px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, #00c853, #0091ea);
+  color: white;
+  padding: 20px;
+}
+
+.sidebar button {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* CONTEÚDO */
+.content {
+  flex: 1;
+  padding: 20px;
+}
+
+/* PAINEL */
+.painel-atendimento {
+  background: white;
+  padding: 20px;
+  border-radius: 16px;
+  text-align: center;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+#atendendoAgora {
+  font-size: 26px;
+  font-weight: bold;
+  color: #00c853;
+}
+
+/* CARDS */
+.cards {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.card {
+  background: white;
+  padding: 10px;
+  border-radius: 10px;
+  flex: 1;
+}
+
+/* AÇÃO */
+.acao {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+input {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+/* BOTÕES */
+button {
+  background: #00c853;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.warning {
+  background: orange;
+}
+.danger {
+  background: red;
+}
+
+/* GRID */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 15px;
+}
+
+/* BOX */
+.box {
+  background: white;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+/* SCROLL */
+.scroll {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+/* LISTA */
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+/* TABELA */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+/* ABAS */
+.aba {
+  display: none;
+}
+.aba.ativa {
+  display: block;
+}
