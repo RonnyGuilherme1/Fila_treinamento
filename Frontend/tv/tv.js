@@ -29,5 +29,5 @@ async function atualizarTV() {
     .join("");
 }
 
-setInterval(atualizarTV, 3000);
+setInterval(atualizarTV, 30000);
 atualizarTV();

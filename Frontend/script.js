@@ -235,4 +235,4 @@ async function atualizar() {
 // INIT
 // =============================
 atualizar();
-setInterval(atualizar, 3000);
+setInterval(atualizar, 60000);
