@@ -4,13 +4,13 @@ async function atualizarTV() {
   try {
     const data = await fetch(`${API}/dashboard`).then((r) => r.json());
 
-    const { filaTreinamento, filaManutencao, atendimento, historico } = data;
+    const { fila, filaManut, atual, historico } = data;
 
     // =============================
     // ATUAL
     // =============================
-    document.getElementById("tv-atual").innerText = atendimento
-      ? `${atendimento.pessoa} → ${atendimento.cliente}`
+    document.getElementById("tv-atual").innerText = atual
+      ? `${atual.pessoa} → ${atual.cliente}`
       : "-";
 
     // =============================
@@ -19,7 +19,7 @@ async function atualizarTV() {
     const ft = document.getElementById("tv-fila-treinamento");
     ft.innerHTML = "";
 
-    filaTreinamento.forEach((p, i) => {
+    (fila || []).forEach((p, i) => {
       ft.innerHTML += `<li><span>${i + 1}º</span> <span>${p.nome}</span></li>`;
     });
 
@@ -29,7 +29,7 @@ async function atualizarTV() {
     const fm = document.getElementById("tv-fila-manutencao");
     fm.innerHTML = "";
 
-    filaManutencao.forEach((p, i) => {
+    (filaManut || []).forEach((p, i) => {
       fm.innerHTML += `<li><span>${i + 1}º</span> <span>${p.nome}</span></li>`;
     });
 
