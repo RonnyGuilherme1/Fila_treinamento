@@ -62,4 +62,13 @@ async function atualizarTV() {
 }
 
 atualizarTV();
-setInterval(atualizarTV, 3000);
+let running = false;
+
+setInterval(async () => {
+  if (running) return;
+  running = true;
+
+  await atualizarTV();
+
+  running = false;
+}, 3000);

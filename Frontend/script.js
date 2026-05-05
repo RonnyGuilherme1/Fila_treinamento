@@ -108,102 +108,132 @@ async function chamarManutencao() {
 // 🚀 ATUALIZAÇÃO PRINCIPAL
 // =============================
 async function atualizar() {
-  const data = await fetch(`${API}/dashboard`).then((r) => r.json());
+  try {
+    const data = await fetch(`${API}/dashboard`).then((r) => r.json());
 
-  const { fila, filaManut, historico, historicoManut } = data;
+    const {
+      fila = [],
+      filaManut = [],
+      atendimentos = [],
+      historico = [],
+      historicoManut = [],
+    } = data;
+    const atendimentos = await fetch(`${API}/atendimento`)
+      .then((r) => r.json())
+      .catch(() => []);
 
-  const atendimentos = await fetch(`${API}/atendimento`).then((r) => r.json());
+    // =============================
+    // ATENDIMENTOS
+    // =============================
+    const box = document.getElementById("atendendoAgora");
 
-  // =============================
-  // ATENDIMENTOS MULTI
-  // =============================
-  const box = document.getElementById("atendendoAgora");
+    if (!box) return;
 
-  box.innerHTML = atendimentos.length
-    ? atendimentos
+    box.innerHTML = (atendimentos || []).length
+      ? atendimentos
+          .map(
+            (a) => `
+            <div class="at-item" onclick="finalizarAtendimento('${a.id}')">
+              ${a.pessoa} → ${a.cliente}
+            </div>
+          `,
+          )
+          .join("")
+      : "-";
+
+    // =============================
+    // FILA
+    // =============================
+    document.getElementById("proximoTreinamento").innerText =
+      fila[0]?.nome || "-";
+
+    document.getElementById("totalTreinamento").innerText = fila.length;
+
+    document.getElementById("filaTreinamento").innerHTML = fila
+      .map((p, i) => `<li>${i + 1}º - ${p.nome}</li>`)
+      .join("");
+
+    // =============================
+    // HISTÓRICO (SAFE MODE)
+    // =============================
+    const h = document.getElementById("historicoTreinamento");
+
+    if (h) {
+      h.innerHTML = historico
+        .map((item) => {
+          const inicio = item.data_inicio
+            ? new Date(item.data_inicio)
+            : item.data
+              ? new Date(item.data)
+              : null;
+
+          const fim = item.data_fim ? new Date(item.data_fim) : null;
+
+          return `
+            <tr>
+              <td>${item.pessoa || "-"}</td>
+              <td>${item.cliente || "-"}</td>
+              <td>${inicio ? inicio.toLocaleString() : "-"}</td>
+              <td>${fim ? fim.toLocaleString() : "Em andamento"}</td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+
+    // =============================
+    // RANKING (SAFE)
+    // =============================
+    const ranking = {};
+
+    (historico || []).forEach((h) => {
+      if (!h.pessoa) return;
+      ranking[h.pessoa] = (ranking[h.pessoa] || 0) + 1;
+    });
+
+    const r = document.getElementById("ranking");
+
+    if (r) {
+      r.innerHTML = Object.entries(ranking)
+        .sort((a, b) => b[1] - a[1])
         .map(
-          (a) => `
-          <div class="at-item" onclick="finalizarAtendimento(${a.id})">
-            ${a.pessoa} → ${a.cliente}
-          </div>
-        `,
+          ([nome, total]) => `
+            <tr>
+              <td>${nome}</td>
+              <td>${total}</td>
+            </tr>
+          `,
         )
-        .join("")
-    : "-";
+        .join("");
+    }
 
-  // =============================
-  // FILA TREINAMENTO
-  // =============================
-  document.getElementById("proximoTreinamento").innerText =
-    fila[0]?.nome || "-";
+    // =============================
+    // MANUTENÇÃO SAFE
+    // =============================
+    const fm = document.getElementById("filaManutencao");
+    if (fm) {
+      fm.innerHTML = filaManut
+        .map((p, i) => `<li>${i + 1}º - ${p.nome}</li>`)
+        .join("");
+    }
 
-  document.getElementById("totalTreinamento").innerText = fila.length;
-
-  document.getElementById("filaTreinamento").innerHTML = fila
-    .map((p, i) => `<li>${i + 1}º - ${p.nome}</li>`)
-    .join("");
-
-  // =============================
-  // HISTÓRICO TREINAMENTO (INÍCIO/FIM)
-  // =============================
-  const h = document.getElementById("historicoTreinamento");
-
-  h.innerHTML = historico
-    .map((item) => {
-      const inicio = new Date(item.data_inicio || item.data);
-      const fim = item.data_fim ? new Date(item.data_fim) : null;
-
-      return `
-        <tr>
-          <td>${item.pessoa}</td>
-          <td>${item.cliente}</td>
-          <td>${inicio.toLocaleString()}</td>
-          <td>${fim ? fim.toLocaleString() : "Em andamento"}</td>
-        </tr>
-      `;
-    })
-    .join("");
-
-  // =============================
-  // RANKING (ORDENADO)
-  // =============================
-  const ranking = {};
-
-  historico.forEach((h) => {
-    if (!h.pessoa) return;
-    ranking[h.pessoa] = (ranking[h.pessoa] || 0) + 1;
-  });
-
-  document.getElementById("ranking").innerHTML = Object.entries(ranking)
-    .sort((a, b) => b[1] - a[1])
-    .map(
-      ([nome, total]) => `
-        <tr>
-          <td>${nome}</td>
-          <td>${total}</td>
-        </tr>
-      `,
-    )
-    .join("");
-
-  // =============================
-  // MANUTENÇÃO
-  // =============================
-  document.getElementById("filaManutencao").innerHTML = filaManut
-    .map((p, i) => `<li>${i + 1}º - ${p.nome}</li>`)
-    .join("");
-
-  document.getElementById("historicoManutencao").innerHTML = historicoManut
-    .map(
-      (item) => `
-        <tr>
-          <td>${item.pessoa}</td>
-          <td>${item.equipamento}</td>
-          <td>${new Date(item.data).toLocaleString()}</td>
-        </tr>
-      `,
-    )
-    .join("");
+    const hm = document.getElementById("historicoManutencao");
+    if (hm) {
+      hm.innerHTML = historicoManut
+        .map(
+          (item) => `
+            <tr>
+              <td>${item.pessoa || "-"}</td>
+              <td>${item.equipamento || "-"}</td>
+              <td>${item.data ? new Date(item.data).toLocaleString() : "-"}</td>
+            </tr>
+          `,
+        )
+        .join("");
+    }
+  } catch (err) {
+    console.error("Erro atualizar():", err);
+  }
 }
 
 // =============================

@@ -1,43 +1,48 @@
 const express = require("express");
 const cors = require("cors");
-const { Pool } = require("pg");
-
 const app = express();
 
-app.use(cors({ origin: "*" }));
+app.use(cors()); // <- MAIS SEGURO no Render
 app.use(express.json());
+
+// health check (IMPORTANTE pro Render não matar o serviço)
+app.get("/", (req, res) => {
+  res.send("API OK");
+});
 
 const pool = require("./db");
 
 // =============================
-// 🚀 DASHBOARD (NOVO - OTIMIZADO)
+// 🚀 DASHBOARD
 // =============================
 app.get("/dashboard", async (req, res) => {
   try {
     const [
       filaTreinamento,
       filaManutencao,
-      atendimento,
+      atendimentos,
       historicoTreinamento,
       historicoManutencao,
     ] = await Promise.all([
       pool.query("SELECT * FROM fila_treinamento ORDER BY posicao"),
       pool.query("SELECT * FROM fila_manutencao ORDER BY posicao"),
-      pool.query("SELECT * FROM atendimento_atual LIMIT 1"),
+      pool.query(
+        "SELECT * FROM atendimentos WHERE fim IS NULL ORDER BY id DESC",
+      ),
       pool.query("SELECT * FROM historico_treinamento ORDER BY id DESC"),
       pool.query("SELECT * FROM historico_manutencao ORDER BY id DESC"),
     ]);
 
     res.json({
-      fila: filaTreinamento.rows,
-      filaManut: filaManutencao.rows,
-      atual: atendimento.rows[0] || null,
-      historico: historicoTreinamento.rows,
-      historicoManut: historicoManutencao.rows,
+      fila: filaTreinamento.rows || [],
+      filaManut: filaManutencao.rows || [],
+      atendimentos: atendimentos.rows || [],
+      historico: historicoTreinamento.rows || [],
+      historicoManut: historicoManutencao.rows || [],
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Erro dashboard");
+    console.error("ERRO DASHBOARD:", err);
+    res.status(500).json({ error: "dashboard error" });
   }
 });
 
@@ -56,11 +61,13 @@ app.post("/fila/treinamento/rotacionar", async (req, res) => {
     "SELECT * FROM fila_treinamento ORDER BY posicao",
   );
 
+  if (!result.rows.length) return res.send("ok");
+
   const primeira = result.rows[0];
 
   await pool.query("UPDATE fila_treinamento SET posicao = posicao - 1");
   await pool.query(
-    "UPDATE fila_treinamento SET posicao = (SELECT MAX(posicao)+1 FROM fila_treinamento) WHERE id=$1",
+    "UPDATE fila_treinamento SET posicao = (SELECT COALESCE(MAX(posicao),0)+1 FROM fila_treinamento) WHERE id=$1",
     [primeira.id],
   );
 
@@ -68,10 +75,10 @@ app.post("/fila/treinamento/rotacionar", async (req, res) => {
 });
 
 // =============================
-// 🔹 ATENDIMENTOS (NOVO MODELO)
+// 🔹 ATENDIMENTOS (MULTI)
 // =============================
 
-// ▶️ INICIAR ATENDIMENTO
+// INICIAR
 app.post("/atendimento", async (req, res) => {
   const { pessoa, cliente } = req.body;
 
@@ -88,7 +95,7 @@ app.post("/atendimento", async (req, res) => {
   res.json(result.rows[0]);
 });
 
-// 🛑 FINALIZAR ATENDIMENTO ESPECÍFICO
+// FINALIZAR ESPECÍFICO
 app.post("/atendimento/finalizar", async (req, res) => {
   const { id } = req.body;
 
@@ -97,18 +104,21 @@ app.post("/atendimento/finalizar", async (req, res) => {
     [id],
   );
 
-  // atualiza histórico com fim
-  await pool.query(
-    `UPDATE historico_treinamento
-     SET data_fim = NOW()
-     WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL`,
-    [result.rows[0].pessoa, result.rows[0].cliente],
-  );
+  if (result.rows.length) {
+    const { pessoa, cliente } = result.rows[0];
+
+    await pool.query(
+      `UPDATE historico_treinamento
+       SET data_fim = NOW()
+       WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL`,
+      [pessoa, cliente],
+    );
+  }
 
   res.send("ok");
 });
 
-// 📥 LISTAR ATIVOS
+// LISTAR ATIVOS
 app.get("/atendimento", async (req, res) => {
   const result = await pool.query(
     "SELECT * FROM atendimentos WHERE fim IS NULL ORDER BY id DESC",
@@ -132,7 +142,7 @@ app.post("/pular", async (req, res) => {
 });
 
 // =============================
-// 🔹 FILA MANUTENÇÃO
+// 🔹 MANUTENÇÃO
 // =============================
 app.get("/fila/manutencao", async (req, res) => {
   const result = await pool.query(
@@ -146,26 +156,14 @@ app.post("/fila/manutencao/rotacionar", async (req, res) => {
     "SELECT * FROM fila_manutencao ORDER BY posicao",
   );
 
+  if (!result.rows.length) return res.send("ok");
+
   const primeira = result.rows[0];
 
   await pool.query("UPDATE fila_manutencao SET posicao = posicao - 1");
   await pool.query(
-    "UPDATE fila_manutencao SET posicao = (SELECT MAX(posicao)+1 FROM fila_manutencao) WHERE id=$1",
+    "UPDATE fila_manutencao SET posicao = (SELECT COALESCE(MAX(posicao),0)+1 FROM fila_manutencao) WHERE id=$1",
     [primeira.id],
-  );
-
-  res.send("ok");
-});
-
-// =============================
-// 🔹 MANUTENÇÃO
-// =============================
-app.post("/manutencao", async (req, res) => {
-  const { pessoa, equipamento } = req.body;
-
-  await pool.query(
-    "INSERT INTO historico_manutencao (pessoa, equipamento) VALUES ($1,$2)",
-    [pessoa, equipamento],
   );
 
   res.send("ok");
