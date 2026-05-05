@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
-
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
@@ -19,6 +18,7 @@ app.get("/dashboard", async (req, res) => {
       atendimentos,
       historicoTreinamento,
       historicoManutencao,
+      ranking,
     ] = await Promise.all([
       pool.query("SELECT * FROM fila_treinamento ORDER BY posicao"),
       pool.query("SELECT * FROM fila_manutencao ORDER BY posicao"),
@@ -27,6 +27,12 @@ app.get("/dashboard", async (req, res) => {
       ),
       pool.query("SELECT * FROM historico_treinamento ORDER BY id DESC"),
       pool.query("SELECT * FROM historico_manutencao ORDER BY id DESC"),
+      pool.query(`
+        SELECT pessoa, COUNT(*) as total
+        FROM historico_treinamento
+        GROUP BY pessoa
+        ORDER BY total DESC
+      `),
     ]);
 
     res.json({
@@ -35,6 +41,7 @@ app.get("/dashboard", async (req, res) => {
       atendimentos: atendimentos.rows,
       historico: historicoTreinamento.rows,
       historicoManut: historicoManutencao.rows,
+      ranking: ranking.rows,
     });
   } catch (err) {
     console.error("DASHBOARD ERROR:", err);
@@ -50,12 +57,9 @@ app.get("/fila/treinamento", async (req, res) => {
   res.json(r.rows);
 });
 
-// =============================
-// ROTACIONAR
-// =============================
+// ROTACIONAR TREINAMENTO
 app.post("/fila/treinamento/rotacionar", async (req, res) => {
   const r = await pool.query("SELECT * FROM fila_treinamento ORDER BY posicao");
-
   if (!r.rows.length) return res.send("ok");
 
   const first = r.rows[0];
@@ -70,7 +74,7 @@ app.post("/fila/treinamento/rotacionar", async (req, res) => {
 });
 
 // =============================
-// ATENDIMENTO (CORRIGIDO)
+// ATENDIMENTO TREINAMENTO
 // =============================
 app.post("/atendimento", async (req, res) => {
   const { pessoa, cliente } = req.body;
@@ -82,20 +86,16 @@ app.post("/atendimento", async (req, res) => {
 
   const atendimento = r.rows[0];
 
-  // 🔥 CRIA HISTÓRICO COM INÍCIO
   await pool.query(
-    `INSERT INTO historico_treinamento
-    (pessoa, cliente, tipo, motivo, data_inicio)
-    VALUES ($1,$2,'Atendimento','-',NOW())`,
+    `INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio)
+     VALUES ($1,$2,'Atendimento','-',NOW())`,
     [pessoa, cliente],
   );
 
   res.json(atendimento);
 });
 
-// =============================
-// FINALIZAR (CORRIGIDO)
-// =============================
+// FINALIZAR ATENDIMENTO
 app.post("/atendimento/finalizar", async (req, res) => {
   const { id } = req.body;
 
@@ -107,37 +107,30 @@ app.post("/atendimento/finalizar", async (req, res) => {
   const att = r.rows[0];
 
   if (att) {
-    // 🔥 atualiza histórico correspondente
     await pool.query(
       `UPDATE historico_treinamento
-       SET data_fim = NOW()
-       WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL`,
+     SET data_fim = NOW()
+     WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL
+     ORDER BY id DESC
+     LIMIT 1`,
       [att.pessoa, att.cliente],
     );
   }
 
   res.send("ok");
 });
-// LISTAR ATIVOS
-app.get("/atendimento", async (req, res) => {
-  const r = await pool.query(
-    "SELECT * FROM atendimentos WHERE fim IS NULL ORDER BY id DESC",
-  );
-
-  res.json(r.rows);
-});
 
 // =============================
-// MANUTENÇÃO
+// FILA MANUTENÇÃO
 // =============================
 app.get("/fila/manutencao", async (req, res) => {
   const r = await pool.query("SELECT * FROM fila_manutencao ORDER BY posicao");
   res.json(r.rows);
 });
 
+// ROTACIONAR MANUTENÇÃO
 app.post("/fila/manutencao/rotacionar", async (req, res) => {
   const r = await pool.query("SELECT * FROM fila_manutencao ORDER BY posicao");
-
   if (!r.rows.length) return res.send("ok");
 
   const first = r.rows[0];
@@ -151,6 +144,7 @@ app.post("/fila/manutencao/rotacionar", async (req, res) => {
   res.send("ok");
 });
 
+// MANUTENÇÃO FINALIZADA
 app.post("/manutencao", async (req, res) => {
   const { pessoa, equipamento } = req.body;
 

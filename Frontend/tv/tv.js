@@ -3,7 +3,7 @@ const API = "https://fila-treinamento.onrender.com";
 async function atualizarTV() {
   const data = await fetch(`${API}/dashboard`).then((r) => r.json());
 
-  const { fila, filaManut, atendimentos, historico } = data;
+  const { fila, filaManut, atendimentos, ranking } = data;
 
   document.getElementById("tv-atual").innerText = atendimentos[0]
     ? `${atendimentos[0].pessoa} → ${atendimentos[0].cliente}`
@@ -15,6 +15,17 @@ async function atualizarTV() {
 
   document.getElementById("tv-fila-manutencao").innerHTML = filaManut
     .map((p, i) => `<li>${i + 1}º ${p.nome}</li>`)
+    .join("");
+
+  document.getElementById("tv-ranking").innerHTML = ranking
+    .map(
+      (r) => `
+      <tr>
+        <td>${r.pessoa}</td>
+        <td>${r.total}</td>
+      </tr>
+    `,
+    )
     .join("");
 }
 

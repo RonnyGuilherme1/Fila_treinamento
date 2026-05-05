@@ -41,9 +41,7 @@
             <input id="clienteTreinamento" placeholder="Cliente" />
             <button onclick="chamarTreinamento()">Iniciar</button>
             <button class="warning" onclick="pularTreinamento()">Pular</button>
-            <button class="danger" onclick="finalizarAtendimento()">
-              Finalizar
-            </button>
+            <button class="danger" onclick="atualizar()">Atualizar</button>
           </div>
 
           <div class="grid">
@@ -118,6 +116,18 @@
           </div>
         </section>
       </main>
+    </div>
+    <div id="modalFinalizar" class="modal hidden">
+      <div class="modal-content">
+        <h2>Finalizar Atendimento</h2>
+
+        <p id="modalTexto">-</p>
+
+        <select id="selectTecnico"></select>
+
+        <button onclick="confirmarFinalizacao()">Finalizar</button>
+        <button onclick="fecharModal()">Cancelar</button>
+      </div>
     </div>
 
     <script src="script.js"></script>
