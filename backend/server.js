@@ -1,9 +1,19 @@
 const express = require("express");
 const cors = require("cors");
+const compression = require("compression");
+const path = require("path");
 
 const app = express();
 app.use(cors({ origin: "*" }));
+app.use(compression());
 app.use(express.json());
+
+// Servir arquivos estáticos com cache
+app.use(
+  express.static(path.join(__dirname, "../Frontend"), {
+    maxAge: "1d", // Cache por 1 dia
+  }),
+);
 
 const pool = require("./db");
 
@@ -25,13 +35,18 @@ app.get("/dashboard", async (req, res) => {
       pool.query(
         "SELECT * FROM atendimentos WHERE fim IS NULL ORDER BY id DESC",
       ),
-      pool.query("SELECT * FROM historico_treinamento ORDER BY id DESC"),
-      pool.query("SELECT * FROM historico_manutencao ORDER BY id DESC"),
+      pool.query(
+        "SELECT * FROM historico_treinamento ORDER BY id DESC LIMIT 50",
+      ),
+      pool.query(
+        "SELECT * FROM historico_manutencao ORDER BY id DESC LIMIT 50",
+      ),
       pool.query(`
         SELECT pessoa, COUNT(*) as total
         FROM historico_treinamento
         GROUP BY pessoa
         ORDER BY total DESC
+        LIMIT 10
       `),
     ]);
 
@@ -69,6 +84,24 @@ app.post("/fila/treinamento/rotacionar", async (req, res) => {
     "UPDATE fila_treinamento SET posicao = (SELECT COALESCE(MAX(posicao),0)+1 FROM fila_treinamento) WHERE id=$1",
     [first.id],
   );
+
+  res.send("ok");
+});
+
+// PULAR TREINAMENTO (mover primeiro para segunda posição)
+app.post("/fila/treinamento/pular", async (req, res) => {
+  const r = await pool.query("SELECT * FROM fila_treinamento ORDER BY posicao");
+  if (r.rows.length < 2) return res.send("ok");
+
+  const first = r.rows[0];
+  const second = r.rows[1];
+
+  await pool.query("UPDATE fila_treinamento SET posicao = 2 WHERE id = $1", [
+    first.id,
+  ]);
+  await pool.query("UPDATE fila_treinamento SET posicao = 1 WHERE id = $1", [
+    second.id,
+  ]);
 
   res.send("ok");
 });

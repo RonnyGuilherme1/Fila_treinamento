@@ -93,13 +93,14 @@ function fecharModal() {
 async function confirmarFinalizacao() {
   if (!atendimentoSelecionado) return;
 
+  fecharModal();
+
   await fetch(`${API}/atendimento/finalizar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id: atendimentoSelecionado.id }),
   });
 
-  fecharModal();
   setTimeout(atualizar, 300);
 }
 
@@ -107,7 +108,7 @@ async function confirmarFinalizacao() {
 // PULAR TREINAMENTO
 // =============================
 async function pularTreinamento() {
-  await fetch(`${API}/fila/treinamento/rotacionar`, { method: "POST" });
+  await fetch(`${API}/fila/treinamento/pular`, { method: "POST" });
   atualizar();
 }
 
