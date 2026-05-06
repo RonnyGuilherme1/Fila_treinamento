@@ -22,39 +22,50 @@ const pool = require("./db");
 // =============================
 app.get("/dashboard", async (req, res) => {
   try {
-    const [
-      filaTreinamento,
-      filaManutencao,
-      atendimentos,
-      historicoTreinamento,
-      historicoManutencao,
-      ranking,
-    ] = await Promise.all([
-      pool.query("SELECT * FROM fila_treinamento ORDER BY posicao"),
-      pool.query("SELECT * FROM fila_manutencao ORDER BY posicao"),
-      pool.query(
+    const filaTreinamento = await pool.query(
+      "SELECT * FROM fila_treinamento ORDER BY posicao",
+    );
+
+    const filaManutencao = await pool.query(
+      "SELECT * FROM fila_manutencao ORDER BY posicao",
+    );
+
+    let atendimentos = { rows: [] };
+
+    try {
+      atendimentos = await pool.query(
         `SELECT a.id, a.pessoa, a.cliente, a.fim,
-                (SELECT tipo FROM historico_treinamento
-                 WHERE pessoa = a.pessoa AND cliente = a.cliente
-                 ORDER BY data DESC LIMIT 1) as tipo
+                COALESCE(
+                  (SELECT tipo FROM historico_treinamento
+                   WHERE pessoa = a.pessoa
+                     AND cliente = a.cliente
+                   ORDER BY data_inicio DESC
+                   LIMIT 1),
+                  'Treinamento'
+                ) as tipo
          FROM atendimentos a
          WHERE a.fim IS NULL
          ORDER BY a.id DESC`,
-      ),
-      pool.query(
-        "SELECT * FROM historico_treinamento ORDER BY id DESC LIMIT 50",
-      ),
-      pool.query(
-        "SELECT * FROM historico_manutencao ORDER BY id DESC LIMIT 50",
-      ),
-      pool.query(`
-        SELECT pessoa, COUNT(*) as total
-        FROM historico_treinamento
-        GROUP BY pessoa
-        ORDER BY total DESC
-        LIMIT 10
-      `),
-    ]);
+      );
+    } catch (err) {
+      console.error("Erro atendimentos:", err.message);
+    }
+
+    const historicoTreinamento = await pool.query(
+      "SELECT * FROM historico_treinamento ORDER BY id DESC LIMIT 50",
+    );
+
+    const historicoManutencao = await pool.query(
+      "SELECT * FROM historico_manutencao ORDER BY id DESC LIMIT 50",
+    );
+
+    const ranking = await pool.query(`
+      SELECT pessoa, COUNT(*) as total
+      FROM historico_treinamento
+      GROUP BY pessoa
+      ORDER BY total DESC
+      LIMIT 10
+    `);
 
     res.json({
       fila: filaTreinamento.rows,
@@ -66,10 +77,9 @@ app.get("/dashboard", async (req, res) => {
     });
   } catch (err) {
     console.error("DASHBOARD ERROR:", err);
-    res.status(500).json({ error: "dashboard fail" });
+    res.status(500).json({ error: err.message });
   }
 });
-
 // =============================
 // FILA TREINAMENTO
 // =============================
