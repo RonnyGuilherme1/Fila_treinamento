@@ -176,13 +176,20 @@ async function confirmarFinalizacao() {
 
   fecharModal();
 
-  await fetch(`${API}/atendimento/finalizar`, {
+  const res = await fetch(`${API}/atendimento/finalizar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
   });
 
-  atualizar(); // Atualizar imediatamente
+  if (!res.ok) {
+    const erro = await res.text();
+    console.error("Erro ao finalizar:", erro);
+    alert("Erro ao finalizar atendimento");
+    return;
+  }
+
+  atualizar();
 }
 
 // =============================
@@ -322,7 +329,7 @@ async function atualizar() {
             <td>${h.tipo}</td>
             <td>${h.motivo}</td>
             <td>${formatarData(h.data)}</td>
-            <td>${formatarDuracao(h.data, h.data_fim)}</td>
+            <td>${formatarDuracao(h.data_inicio, h.data_fim)}</td>
           </tr>
         `,
         )

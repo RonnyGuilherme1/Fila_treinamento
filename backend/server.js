@@ -159,12 +159,17 @@ app.post("/atendimento/finalizar", async (req, res) => {
     const att = r.rows[0];
 
     if (att) {
-      // Atualizar data_fim no histórico
       await client.query(
         `UPDATE historico_treinamento
          SET data_fim = NOW()
-         WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL
-         ORDER BY id DESC LIMIT 1`,
+         WHERE id = (
+           SELECT id FROM historico_treinamento
+           WHERE pessoa = $1
+             AND cliente = $2
+             AND data_fim IS NULL
+           ORDER BY id DESC
+           LIMIT 1
+         )`,
         [att.pessoa, att.cliente],
       );
     }
@@ -174,7 +179,7 @@ app.post("/atendimento/finalizar", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("Erro finalizar atendimento:", err);
-    res.status(500).send("Erro interno");
+    res.status(500).send(err.message);
   } finally {
     client.release();
   }
