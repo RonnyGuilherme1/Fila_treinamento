@@ -119,7 +119,7 @@ app.post("/fila/treinamento/pular", async (req, res) => {
 // ATENDIMENTO TREINAMENTO
 // =============================
 app.post("/atendimento", async (req, res) => {
-  const { pessoa, cliente, tipo = 'Atendimento' } = req.body;
+  const { pessoa, cliente, tipo = "Atendimento" } = req.body;
 
   const r = await pool.query(
     "INSERT INTO atendimentos (pessoa, cliente) VALUES ($1,$2) RETURNING *",
