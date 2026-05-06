@@ -56,6 +56,7 @@ body {
   display: flex;
   gap: 10px;
   margin: 10px 0;
+  align-items: flex-start;
 }
 
 .card {
@@ -63,6 +64,26 @@ body {
   padding: 10px;
   border-radius: 10px;
   flex: 1;
+}
+
+.cards-top .queue-card {
+  flex: 2.1;
+  min-width: 280px;
+  min-height: 140px;
+  background: #f6f9ff;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  padding: 24px 22px;
+  cursor: pointer;
+}
+
+.cards-top .total-card {
+  flex: 0.9;
+}
+
+.queue-label {
+  margin: 6px 0 0;
+  color: #5f6f8f;
+  font-size: 0.95rem;
 }
 
 /* AÇÃO */
@@ -86,9 +107,10 @@ body {
 
 .acao button {
   flex: 0 0 auto;
-  min-width: 110px;
-  padding: 10px 14px;
-  border-radius: 10px;
+  min-width: 150px;
+  min-height: 48px;
+  padding: 14px 20px;
+  border-radius: 14px;
   font-weight: 600;
 }
 
@@ -97,6 +119,16 @@ button {
   color: white;
   border: none;
   cursor: pointer;
+  border-radius: 14px;
+  padding: 12px 18px;
+  min-height: 42px;
+}
+
+.modal-content button,
+.modal-actions button {
+  min-width: 130px;
+  padding: 12px 18px;
+  border-radius: 12px;
 }
 
 .warning {
@@ -109,8 +141,12 @@ button {
 /* GRID */
 .grid {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: 1fr;
   gap: 15px;
+}
+
+.full-width-box {
+  width: 100%;
 }
 
 /* BOX */
@@ -160,13 +196,30 @@ button {
   max-height: 0;
   overflow: hidden;
   opacity: 0;
+  visibility: hidden;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #dfe7f3;
   transition:
     max-height 0.25s ease,
-    opacity 0.25s ease;
+    opacity 0.25s ease,
+    visibility 0s linear 0.25s;
+}
+
+.fila-card.expanded .fila-completa,
+.fila-card:hover .fila-completa,
+.queue-card:hover .fila-completa,
+.queue-card:focus-within .fila-completa {
+  max-height: 450px;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .fila-card:hover .fila-completa,
-.fila-card:focus-within .fila-completa {
+.fila-card:focus-within .fila-completa,
+.queue-card:hover .fila-completa,
+.queue-card:focus-within .fila-completa {
   max-height: 260px;
   opacity: 1;
 }
@@ -185,10 +238,10 @@ button {
 
 .fila-completa li {
   background: #ffffff;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
   border: 1px solid #e5ecff;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .fila-completa li:last-child {

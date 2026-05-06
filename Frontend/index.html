@@ -26,12 +26,22 @@
             <p id="atendendoAgora">-</p>
           </div>
 
-          <div class="cards">
-            <div class="card">
-              <h3>Próximo</h3>
-              <p id="proximoTreinamento">-</p>
+          <div class="cards cards-top">
+            <div class="card queue-card fila-card" tabindex="0">
+              <div class="fila-card-header">
+                <div>
+                  <h3>Próximo</h3>
+                  <p class="queue-label">
+                    Passe o mouse para ver a fila completa
+                  </p>
+                </div>
+                <p id="proximoTreinamento">-</p>
+              </div>
+              <div class="fila-completa">
+                <ul id="filaTreinamentoHover"></ul>
+              </div>
             </div>
-            <div class="card">
+            <div class="card total-card">
               <h3>Total</h3>
               <p id="totalTreinamento">0</p>
             </div>
@@ -51,23 +61,7 @@
           </div>
 
           <div class="grid">
-            <div class="box fila-box">
-              <h3>Fila</h3>
-              <div class="fila-card" tabindex="0">
-                <div class="fila-card-header">
-                  <span>Próximo</span>
-                  <p id="proximoTreinamento">-</p>
-                </div>
-                <div class="fila-completa">
-                  <p class="fila-indicator">
-                    Passe o mouse ou clique para ver a fila completa
-                  </p>
-                  <ul id="filaTreinamento"></ul>
-                </div>
-              </div>
-            </div>
-
-            <div class="box">
+            <div class="box full-width-box">
               <h3>Histórico</h3>
               <div class="scroll">
                 <table>

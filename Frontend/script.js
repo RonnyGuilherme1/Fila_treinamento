@@ -209,11 +209,13 @@ async function atualizar() {
     // FILA TREINAMENTO
     // =============================
     const filaBox = document.getElementById("filaTreinamento");
-    if (filaBox) {
-      filaBox.innerHTML = fila
-        .map((p, i) => `<li>${i + 1}º - ${p.nome}</li>`)
-        .join("");
-    }
+    const filaHover = document.getElementById("filaTreinamentoHover");
+    const filaHtml = fila
+      .map((p, i) => `<li>${i + 1}º - ${p.nome}</li>`)
+      .join("");
+
+    if (filaBox) filaBox.innerHTML = filaHtml;
+    if (filaHover) filaHover.innerHTML = filaHtml;
 
     const prox = document.getElementById("proximoTreinamento");
     if (prox) prox.innerText = fila[0]?.nome || "-";
@@ -291,7 +293,20 @@ async function atualizar() {
 }
 
 // =============================
+// QUEUE CARD TOGGLE
+// =============================
+function initQueueCard() {
+  const queueCard = document.querySelector(".queue-card");
+  if (!queueCard) return;
+
+  queueCard.addEventListener("click", () => {
+    queueCard.classList.toggle("expanded");
+  });
+}
+
+// =============================
 // INIT
 // =============================
 atualizar();
+initQueueCard();
 setInterval(atualizar, 60000);
