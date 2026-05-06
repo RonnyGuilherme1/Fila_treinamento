@@ -4,9 +4,25 @@ const API =
     : "https://fila-treinamento.onrender.com";
 
 // =============================
+// FORMATADOR DE DATA
+// =============================
+function formatarData(dataStr) {
+  if (!dataStr) return "-";
+  const data = new Date(dataStr);
+  const dia = String(data.getDate()).padStart(2, "0");
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const ano = data.getFullYear();
+  const hora = String(data.getHours()).padStart(2, "0");
+  const minuto = String(data.getMinutes()).padStart(2, "0");
+  const segundo = String(data.getSeconds()).padStart(2, "0");
+  return `${dia}/${mes}/${ano} ${hora}:${minuto}:${segundo}`;
+}
+
+// =============================
 // ESTADO GLOBAL (MODAL)
 // =============================
 let atendimentoSelecionado = null;
+let pessoaSendoPulada = null;
 
 // =============================
 // ABA
@@ -87,6 +103,14 @@ function fecharModal() {
   atendimentoSelecionado = null;
 }
 
+// Permitir fechar modal ao pressionar ESC
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") {
+    fecharModal();
+    fecharModalPular();
+  }
+});
+
 // =============================
 // MODAL - CONFIRMAR FINALIZAÇÃO
 // =============================
@@ -101,15 +125,46 @@ async function confirmarFinalizacao() {
     body: JSON.stringify({ id: atendimentoSelecionado.id }),
   });
 
-  setTimeout(atualizar, 300);
+  atualizar(); // Atualizar imediatamente
 }
 
 // =============================
-// PULAR TREINAMENTO
+// PULAR TREINAMENTO - ABRIR MODAL
 // =============================
 async function pularTreinamento() {
-  await fetch(`${API}/fila/treinamento/pular`, { method: "POST" });
+  const fila = await fetch(`${API}/fila/treinamento`).then((r) => r.json());
+  if (!fila.length) return alert("Fila vazia");
+
+  pessoaSendoPulada = fila[0].nome;
+  document.getElementById("inputMotivoPular").value = "";
+  document.getElementById("modalPular").classList.remove("hidden");
+}
+
+// =============================
+// MODAL PULAR - CONFIRMAR
+// =============================
+async function confirmarPular() {
+  const motivo = document.getElementById("inputMotivoPular").value.trim();
+
+  if (!motivo) return alert("Informe o motivo");
+
+  fecharModalPular();
+
+  await fetch(`${API}/fila/treinamento/pular`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ motivo }),
+  });
+
   atualizar();
+}
+
+// =============================
+// MODAL PULAR - FECHAR
+// =============================
+function fecharModalPular() {
+  document.getElementById("modalPular").classList.add("hidden");
+  pessoaSendoPulada = null;
 }
 
 // =============================
@@ -186,7 +241,7 @@ async function atualizar() {
             <td>${h.cliente}</td>
             <td>${h.tipo}</td>
             <td>${h.motivo}</td>
-            <td>${h.data_inicio || "-"}</td>
+            <td>${formatarData(h.data_inicio)}</td>
           </tr>
         `,
         )
@@ -204,7 +259,7 @@ async function atualizar() {
           <tr>
             <td>${h.pessoa}</td>
             <td>${h.equipamento}</td>
-            <td>${h.data || "-"}</td>
+            <td>${formatarData(h.data)}</td>
           </tr>
         `,
         )

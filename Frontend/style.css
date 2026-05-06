@@ -138,6 +138,33 @@ td {
   border-bottom: 1px solid #eee;
 }
 
+/* ESPAÇAMENTO MELHORADO PARA RANKING */
+#ranking th:first-child,
+#ranking td:first-child,
+#historicoTreinamento th:first-child,
+#historicoTreinamento td:first-child,
+#historicoManutencao th:first-child,
+#historicoManutencao td:first-child {
+  text-align: left;
+}
+
+#ranking th:last-child,
+#ranking td:last-child {
+  text-align: center;
+  font-weight: bold;
+  width: 80px;
+}
+
+#ranking th {
+  padding: 12px 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+#ranking td {
+  padding: 10px 8px;
+}
+
 /* ABAS */
 .aba {
   display: none;
@@ -238,6 +265,7 @@ ul li:hover {
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1000;
 }
 
 .modal-content {
@@ -245,6 +273,87 @@ ul li:hover {
   padding: 20px;
   border-radius: 10px;
   width: 300px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-pular {
+  width: 400px;
+}
+
+.modal-pular textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-family: "Segoe UI";
+  font-size: 14px;
+  resize: vertical;
+  min-height: 100px;
+  margin: 15px 0;
+  box-sizing: border-box;
+}
+
+.modal-pular textarea:focus {
+  outline: none;
+  border-color: #00c853;
+  box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.1);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.btn-primary {
+  flex: 1;
+  background: #00c853;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: #00a844;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 200, 83, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  flex: 1;
+  background: #f0f0f0;
+  color: #333;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: #e0e0e0;
+  transform: translateY(-2px);
 }
 
 .hidden {

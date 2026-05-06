@@ -128,6 +128,25 @@
       </div>
     </div>
 
+    <div id="modalPular" class="modal hidden">
+      <div class="modal-content modal-pular">
+        <h2>Motivo da Pulada</h2>
+
+        <textarea
+          id="inputMotivoPular"
+          placeholder="Digite o motivo pela qual está pulando a vez..."
+          maxlength="150"
+        ></textarea>
+
+        <div class="modal-actions">
+          <button class="btn-primary" onclick="confirmarPular()">Pular</button>
+          <button class="btn-secondary" onclick="fecharModalPular()">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="script.min.js"></script>
   </body>
 </html>

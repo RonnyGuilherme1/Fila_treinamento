@@ -25,6 +25,7 @@ CREATE TABLE historico_treinamento (
 
 CREATE INDEX idx_data_historico_treinamento ON historico_treinamento (data DESC);
 CREATE INDEX idx_pessoa_historico_treinamento ON historico_treinamento (pessoa);
+CREATE INDEX idx_hist_treinamento_finalizar ON historico_treinamento (pessoa, cliente, data_fim, id DESC);
 
 CREATE TABLE historico_manutencao (
   id SERIAL PRIMARY KEY,

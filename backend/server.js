@@ -90,6 +90,8 @@ app.post("/fila/treinamento/rotacionar", async (req, res) => {
 
 // PULAR TREINAMENTO (mover primeiro para segunda posição)
 app.post("/fila/treinamento/pular", async (req, res) => {
+  const { motivo = "Não especificado" } = req.body;
+
   const r = await pool.query("SELECT * FROM fila_treinamento ORDER BY posicao");
   if (r.rows.length < 2) return res.send("ok");
 
@@ -102,6 +104,13 @@ app.post("/fila/treinamento/pular", async (req, res) => {
   await pool.query("UPDATE fila_treinamento SET posicao = 1 WHERE id = $1", [
     second.id,
   ]);
+
+  // Registrar no histórico que foi pulado
+  await pool.query(
+    `INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio)
+     VALUES ($1, $2, 'Pulada', $3, NOW())`,
+    [first.nome, "Sistema", motivo],
+  );
 
   res.send("ok");
 });
@@ -132,25 +141,39 @@ app.post("/atendimento", async (req, res) => {
 app.post("/atendimento/finalizar", async (req, res) => {
   const { id } = req.body;
 
-  const r = await pool.query(
-    "UPDATE atendimentos SET fim = NOW() WHERE id = $1 RETURNING *",
-    [id],
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  const att = r.rows[0];
-
-  if (att) {
-    await pool.query(
-      `UPDATE historico_treinamento
-     SET data_fim = NOW()
-     WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL
-     ORDER BY id DESC
-     LIMIT 1`,
-      [att.pessoa, att.cliente],
+    const r = await client.query(
+      "UPDATE atendimentos SET fim = NOW() WHERE id = $1 RETURNING *",
+      [id],
     );
-  }
 
-  res.send("ok");
+    const att = r.rows[0];
+
+    if (att) {
+      await client.query(
+        `UPDATE historico_treinamento
+       SET data_fim = NOW()
+       WHERE id = (
+         SELECT id FROM historico_treinamento
+         WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL
+         ORDER BY id DESC LIMIT 1
+       )`,
+        [att.pessoa, att.cliente],
+      );
+    }
+
+    await client.query("COMMIT");
+    res.send("ok");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro finalizar atendimento:", err);
+    res.status(500).send("Erro interno");
+  } finally {
+    client.release();
+  }
 });
 
 // =============================
