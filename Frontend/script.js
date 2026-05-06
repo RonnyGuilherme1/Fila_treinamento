@@ -117,12 +117,14 @@ document.addEventListener("keydown", function (e) {
 async function confirmarFinalizacao() {
   if (!atendimentoSelecionado) return;
 
+  const id = atendimentoSelecionado.id;
+
   fecharModal();
 
   await fetch(`${API}/atendimento/finalizar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: atendimentoSelecionado.id }),
+    body: JSON.stringify({ id }),
   });
 
   atualizar(); // Atualizar imediatamente
