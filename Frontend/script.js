@@ -328,7 +328,7 @@ async function atualizar() {
             <td>${h.cliente}</td>
             <td>${h.tipo}</td>
             <td>${h.motivo}</td>
-            <td>${formatarData(h.data)}</td>
+            <td>${formatarData(h.data_inicio)}</td>
             <td>${formatarDuracao(h.data_inicio, h.data_fim)}</td>
           </tr>
         `,
