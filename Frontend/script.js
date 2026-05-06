@@ -295,11 +295,18 @@ async function atualizar() {
 // =============================
 // QUEUE CARD TOGGLE
 // =============================
+function toggleFila() {
+  const queueCard = document.querySelector(".queue-card");
+  if (!queueCard) return;
+  queueCard.classList.toggle("expanded");
+}
+
 function initQueueCard() {
   const queueCard = document.querySelector(".queue-card");
   if (!queueCard) return;
 
-  queueCard.addEventListener("click", () => {
+  queueCard.addEventListener("click", (event) => {
+    if (event.target.closest(".queue-toggle")) return;
     queueCard.classList.toggle("expanded");
   });
 }
