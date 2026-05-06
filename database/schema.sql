@@ -20,7 +20,8 @@ CREATE TABLE historico_treinamento (
   cliente TEXT,
   tipo TEXT,
   motivo TEXT,
-  data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  data TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  data_fim TIMESTAMP
 );
 
 CREATE INDEX idx_data_historico_treinamento ON historico_treinamento (data DESC);

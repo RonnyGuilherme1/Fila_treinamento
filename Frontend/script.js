@@ -19,6 +19,26 @@ function formatarData(dataStr) {
 }
 
 // =============================
+// FORMATADOR DE DURAÇÃO
+// =============================
+function formatarDuracao(inicio, fim) {
+  if (!inicio || !fim) return "-";
+  const diff = new Date(fim) - new Date(inicio);
+  const segundos = Math.floor(diff / 1000);
+  const minutos = Math.floor(segundos / 60);
+  const horas = Math.floor(minutos / 60);
+  const segRest = segundos % 60;
+  const minRest = minutos % 60;
+  if (horas > 0) {
+    return `${horas}h ${minRest}m ${segRest}s`;
+  } else if (minutos > 0) {
+    return `${minutos}m ${segRest}s`;
+  } else {
+    return `${segundos}s`;
+  }
+}
+
+// =============================
 // ESTADO GLOBAL (MODAL)
 // =============================
 let atendimentoSelecionado = null;
@@ -301,7 +321,8 @@ async function atualizar() {
             <td>${h.cliente}</td>
             <td>${h.tipo}</td>
             <td>${h.motivo}</td>
-            <td>${formatarData(h.data_inicio)}</td>
+            <td>${formatarData(h.data)}</td>
+            <td>${formatarDuracao(h.data, h.data_fim)}</td>
           </tr>
         `,
         )

@@ -159,8 +159,14 @@ app.post("/atendimento/finalizar", async (req, res) => {
     const att = r.rows[0];
 
     if (att) {
-      // Registrar conclusão (sem data_fim já que a coluna não existe)
-      // O histórico permanece como está
+      // Atualizar data_fim no histórico
+      await client.query(
+        `UPDATE historico_treinamento
+         SET data_fim = NOW()
+         WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL
+         ORDER BY id DESC LIMIT 1`,
+        [att.pessoa, att.cliente],
+      );
     }
 
     await client.query("COMMIT");
