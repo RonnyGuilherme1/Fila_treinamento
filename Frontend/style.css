@@ -120,6 +120,77 @@ button {
   padding: 10px;
 }
 
+.fila-card {
+  background: #f6f9ff;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fila-card:hover,
+.fila-card:focus-within {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.1);
+}
+
+.fila-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.fila-card-header span {
+  font-weight: 700;
+  color: #333;
+}
+
+.fila-card-header p {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #00c853;
+}
+
+.fila-completa {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.25s ease, opacity 0.25s ease;
+}
+
+.fila-card:hover .fila-completa,
+.fila-card:focus-within .fila-completa {
+  max-height: 260px;
+  opacity: 1;
+}
+
+.fila-indicator {
+  margin: 0 0 10px;
+  color: #5f6f8f;
+  font-size: 0.9rem;
+}
+
+.fila-completa ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.fila-completa li {
+  background: #ffffff;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e5ecff;
+  margin-bottom: 8px;
+}
+
+.fila-completa li:last-child {
+  margin-bottom: 0;
+}
+
 /* SCROLL */
 .scroll {
   max-height: 250px;
@@ -141,12 +212,35 @@ li {
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 th,
 td {
-  padding: 8px;
+  padding: 10px 12px;
   border-bottom: 1px solid #eee;
+  text-align: left;
+  word-wrap: break-word;
+}
+
+th:nth-child(1), td:nth-child(1) {
+  width: 22%;
+}
+
+th:nth-child(2), td:nth-child(2) {
+  width: 22%;
+}
+
+th:nth-child(3), td:nth-child(3) {
+  width: 18%;
+}
+
+th:nth-child(4), td:nth-child(4) {
+  width: 18%;
+}
+
+th:nth-child(5), td:nth-child(5) {
+  width: 20%;
 }
 
 /* ESPAÇAMENTO MELHORADO PARA RANKING */

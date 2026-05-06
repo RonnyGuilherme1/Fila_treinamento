@@ -51,9 +51,18 @@
           </div>
 
           <div class="grid">
-            <div class="box">
+            <div class="box fila-box">
               <h3>Fila</h3>
-              <ul id="filaTreinamento"></ul>
+              <div class="fila-card" tabindex="0">
+                <div class="fila-card-header">
+                  <span>Próximo</span>
+                  <p id="proximoTreinamento">-</p>
+                </div>
+                <div class="fila-completa">
+                  <p class="fila-indicator">Passe o mouse ou clique para ver a fila completa</p>
+                  <ul id="filaTreinamento"></ul>
+                </div>
+              </div>
             </div>
 
             <div class="box">
