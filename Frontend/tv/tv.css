@@ -109,3 +109,86 @@
   font-weight: bold;
   background: #e8f5e9;
 }
+
+/* ===========================
+   CARDS DE ATENDIMENTO NA TV
+   =========================== */
+
+.tv-atendimentos-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 60px;
+  justify-content: center;
+}
+
+.tv-atendimento-card {
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-left: 6px solid #00c853;
+}
+
+.tv-atendimento-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+.tv-atendimento-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 20px;
+}
+
+.tv-atendimento-titulo h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.tv-atendimento-cliente {
+  margin: 4px 0 0 0;
+  font-size: 16px;
+  color: #666;
+  font-weight: 500;
+}
+
+.tv-atendimento-tipo-label {
+  margin: 6px 0 0 0;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.tv-atendimento-tipo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-radius: 20px;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.tv-atendimento-tipo span:first-child {
+  font-size: 18px;
+}
+
+.tv-sem-atendimento {
+  text-align: center;
+  color: #999;
+  font-size: 24px;
+  margin: 0;
+  padding: 40px 20px;
+}

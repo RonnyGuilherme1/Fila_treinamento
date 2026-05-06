@@ -33,7 +33,13 @@ app.get("/dashboard", async (req, res) => {
       pool.query("SELECT * FROM fila_treinamento ORDER BY posicao"),
       pool.query("SELECT * FROM fila_manutencao ORDER BY posicao"),
       pool.query(
-        "SELECT * FROM atendimentos WHERE fim IS NULL ORDER BY id DESC",
+        `SELECT a.id, a.pessoa, a.cliente, a.fim,
+                (SELECT tipo FROM historico_treinamento
+                 WHERE pessoa = a.pessoa AND cliente = a.cliente
+                 ORDER BY data DESC LIMIT 1) as tipo
+         FROM atendimentos a
+         WHERE a.fim IS NULL
+         ORDER BY a.id DESC`,
       ),
       pool.query(
         "SELECT * FROM historico_treinamento ORDER BY id DESC LIMIT 50",
@@ -153,16 +159,8 @@ app.post("/atendimento/finalizar", async (req, res) => {
     const att = r.rows[0];
 
     if (att) {
-      await client.query(
-        `UPDATE historico_treinamento
-       SET data_fim = NOW()
-       WHERE id = (
-         SELECT id FROM historico_treinamento
-         WHERE pessoa = $1 AND cliente = $2 AND data_fim IS NULL
-         ORDER BY id DESC LIMIT 1
-       )`,
-        [att.pessoa, att.cliente],
-      );
+      // Registrar conclusão (sem data_fim já que a coluna não existe)
+      // O histórico permanece como está
     }
 
     await client.query("COMMIT");

@@ -206,7 +206,7 @@ button {
 
 .fila-card-header p {
   margin: 0;
-  font-size: 50px;
+  font-size: 1.5rem;
   font-weight: 1000;
   color: #00c853;
 }
@@ -544,4 +544,185 @@ ul li:hover {
 
 .hidden {
   display: none;
+}
+
+/* ===========================
+   CARDS DE ATENDIMENTO BONITOS
+   =========================== */
+
+.atendimentos-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 60px;
+  justify-content: center;
+}
+
+.atendimento-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.atendimento-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+.atendimento-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 20px;
+}
+
+.atendimento-titulo h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.atendimento-cliente {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.atendimento-tipo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.atendimento-tipo span:first-child {
+  font-size: 16px;
+}
+
+.atendimento-tipo-label {
+  margin: 6px 0 0 0;
+  font-size: 15px;
+  color: #666;
+  font-weight: 500;
+}
+
+.atendimento-btn-finalizar {
+  background: #00c853;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.atendimento-btn-finalizar:hover {
+  background: #00a844;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 200, 83, 0.3);
+}
+
+.atendimento-btn-finalizar:active {
+  transform: translateY(0);
+}
+
+.sem-atendimento {
+  text-align: center;
+  color: #999;
+  font-size: 16px;
+  margin: 0;
+  padding: 20px;
+}
+
+/* ===========================
+   NOTIFICAÇÃO TOAST
+   =========================== */
+
+.toast-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #00c853, #00a844);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 200, 83, 0.3);
+  z-index: 2000;
+  opacity: 0;
+  transform: translateY(100px);
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  pointer-events: auto;
+}
+
+.toast-notification.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.toast-content span {
+  font-size: 20px;
+  font-weight: bold;
+  display: inline-block;
+  animation: bounce 0.6s ease;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+.toast-content p {
+  margin: 0;
+}
+
+/* ===========================
+   RESPONSIVE
+   =========================== */
+
+@media (max-width: 768px) {
+  .atendimento-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .atendimento-tipo {
+    align-self: flex-start;
+  }
+
+  .toast-notification {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+  }
 }

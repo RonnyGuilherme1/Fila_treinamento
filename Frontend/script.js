@@ -36,6 +36,30 @@ function trocarAba(nome) {
 }
 
 // =============================
+// TOAST NOTIFICATION
+// =============================
+function mostrarToast(mensagem) {
+  const toast = document.createElement("div");
+  toast.className = "toast-notification";
+  toast.innerHTML = `
+    <div class="toast-content">
+      <span>✓</span>
+      <p>${mensagem}</p>
+    </div>
+  `;
+  document.body.appendChild(toast);
+
+  // Animar entrada
+  setTimeout(() => toast.classList.add("show"), 10);
+
+  // Remover após 4 segundos
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+// =============================
 // TREINAMENTO INICIAR
 // =============================
 async function chamarTreinamento() {
@@ -55,6 +79,9 @@ async function chamarTreinamento() {
   });
 
   await fetch(`${API}/fila/treinamento/rotacionar`, { method: "POST" });
+
+  // Mostrar mensagem de sucesso
+  mostrarToast("Iniciar a atividade na central de funcionário");
 
   atualizar();
 }
@@ -86,6 +113,13 @@ async function chamarManutencao() {
 // MODAL - ABRIR
 // =============================
 function abrirModal(el) {
+  // Se for um evento, pegar o elemento mais próximo com data-at
+  if (el.preventDefault) {
+    el.preventDefault();
+    el.stopPropagation();
+    el = el.target.closest(".atendimento-card");
+  }
+
   const atendimento = JSON.parse(decodeURIComponent(el.dataset.at));
 
   atendimentoSelecionado = atendimento;
@@ -192,17 +226,38 @@ async function atualizar() {
     const box = document.getElementById("atendendoAgora");
 
     if (box) {
-      box.innerHTML = atendimentos.length
-        ? atendimentos
-            .map(
-              (a) => `
-  <div class="at-item" data-at='${encodeURIComponent(JSON.stringify(a))}' onclick="abrirModal(this)">
-    ${a.pessoa} → ${a.cliente}
+      if (atendimentos.length) {
+        box.innerHTML = atendimentos
+          .map((a) => {
+            // Definir cores por tipo de treinamento
+            let cor = "#00c853"; // Verde padrão
+            let tipo = a.tipo || "Treinamento";
+
+            // Verificar tipo e aplicar cor
+            if (tipo.includes("2°") || tipo.includes("2º")) {
+              cor = "#1976d2"; // Azul
+            } else if (tipo.includes("3°") || tipo.includes("3º")) {
+              cor = "#f57c00"; // Laranja
+            } else if (tipo.includes("Dúvida") || tipo.includes("Dúvidas")) {
+              cor = "#7b1fa2"; // Roxo
+            }
+
+            return `
+  <div class="atendimento-card" style="border-left: 6px solid ${cor}" data-at='${encodeURIComponent(JSON.stringify(a))}' onclick="abrirModal(this)">
+    <div class="atendimento-header">
+      <div class="atendimento-titulo">
+        <h3>${a.pessoa}</h3>
+        <p class="atendimento-cliente">${a.cliente || "-"} - ${tipo}</p>
+      </div>
+      <button class="atendimento-btn-finalizar" onclick="abrirModal(event)">Finalizar</button>
+    </div>
   </div>
-`,
-            )
-            .join("")
-        : "-";
+`;
+          })
+          .join("");
+      } else {
+        box.innerHTML = '<p class="sem-atendimento">-</p>';
+      }
     }
 
     // =============================
