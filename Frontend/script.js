@@ -39,7 +39,8 @@ function trocarAba(nome) {
 // TREINAMENTO INICIAR
 // =============================
 async function chamarTreinamento() {
-  const cliente = document.getElementById("clienteTreinamento").value;
+  const cliente = document.getElementById("clienteTreinamento").value.trim();
+  const tipo = document.getElementById("tipoTreinamento").value;
   if (!cliente) return alert("Informe o cliente");
 
   const fila = await fetch(`${API}/fila/treinamento`).then((r) => r.json());
@@ -50,7 +51,7 @@ async function chamarTreinamento() {
   await fetch(`${API}/atendimento`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pessoa, cliente }),
+    body: JSON.stringify({ pessoa, cliente, tipo }),
   });
 
   await fetch(`${API}/fila/treinamento/rotacionar`, { method: "POST" });

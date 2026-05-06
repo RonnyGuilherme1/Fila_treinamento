@@ -119,7 +119,7 @@ app.post("/fila/treinamento/pular", async (req, res) => {
 // ATENDIMENTO TREINAMENTO
 // =============================
 app.post("/atendimento", async (req, res) => {
-  const { pessoa, cliente } = req.body;
+  const { pessoa, cliente, tipo = 'Atendimento' } = req.body;
 
   const r = await pool.query(
     "INSERT INTO atendimentos (pessoa, cliente) VALUES ($1,$2) RETURNING *",
@@ -130,8 +130,8 @@ app.post("/atendimento", async (req, res) => {
 
   await pool.query(
     `INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio)
-     VALUES ($1,$2,'Atendimento','-',NOW())`,
-    [pessoa, cliente],
+     VALUES ($1,$2,$3,'-',NOW())`,
+    [pessoa, cliente, tipo],
   );
 
   res.json(atendimento);

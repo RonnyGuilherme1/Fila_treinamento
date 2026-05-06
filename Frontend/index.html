@@ -22,7 +22,7 @@
         <!-- TREINAMENTO -->
         <section id="treinamento" class="aba ativa">
           <div class="painel-atendimento">
-            <h2>Atendendo agora</h2>
+            <h2>Em treinamento</h2>
             <p id="atendendoAgora">-</p>
           </div>
 
@@ -39,6 +39,12 @@
 
           <div class="acao">
             <input id="clienteTreinamento" placeholder="Cliente" />
+            <select id="tipoTreinamento">
+              <option value="1° treinamento">1° treinamento</option>
+              <option value="2° treinamento">2° treinamento</option>
+              <option value="3° treinamento">3° treinamento</option>
+              <option value="Treinamento/Dúvidas">Treinamento/Dúvidas</option>
+            </select>
             <button onclick="chamarTreinamento()">Iniciar</button>
             <button class="warning" onclick="pularTreinamento()">Pular</button>
             <button class="danger" onclick="atualizar()">Atualizar</button>
