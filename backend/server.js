@@ -269,10 +269,8 @@ app.get("/historico/completo", async (req, res) => {
     const puladas = await pool.query(`
       SELECT
         pessoa,
-        cliente,
-        tipo,
-        data_inicio,
-        data_fim
+        motivo,
+        data_inicio
       FROM historico_treinamento
       WHERE tipo = 'Pulada'
       ORDER BY id DESC

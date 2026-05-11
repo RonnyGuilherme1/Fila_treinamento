@@ -43,12 +43,12 @@ async function carregarHistorico() {
   document.getElementById("tbPuladas").innerHTML = data.puladas
     .map(
       (h) => `
-      <tr>
-        <td>${h.pessoa}</td>
-        <td>${h.motivo || "-"}</td>
-        <td>${formatarData(h.data_inicio)}</td>
-      </tr>
-    `,
+    <tr>
+      <td>${h.pessoa || "-"}</td>
+      <td>${h.motivo || "-"}</td>
+      <td>${formatarData(h.data_inicio)}</td>
+    </tr>
+  `,
     )
     .join("");
 }
