@@ -23,6 +23,13 @@ function formatarDuracao(inicio, fim) {
   return `${minutos}m ${segundos % 60}s`;
 }
 
+function limparFiltro() {
+  document.getElementById("dataInicio").value = "";
+  document.getElementById("dataFim").value = "";
+
+  carregarHistorico();
+}
+
 async function carregarHistorico() {
   const inicio = document.getElementById("dataInicio")?.value || "";
   const fim = document.getElementById("dataFim")?.value || "";

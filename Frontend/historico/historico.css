@@ -343,3 +343,19 @@ tbody tr:hover {
   opacity: 0.9;
   transform: scale(1.03);
 }
+
+.btn-limpar {
+  background: #e5e7eb;
+  color: #111827;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+.btn-limpar:hover {
+  background: #d1d5db;
+  transform: scale(1.03);
+}
