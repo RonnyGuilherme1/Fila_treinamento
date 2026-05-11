@@ -289,13 +289,6 @@ app.get("/historico/completo", async (req, res) => {
       LIMIT 100
     `);
 
-    const manutencao = await pool.query(`
-      SELECT *
-      FROM historico_manutencao
-      ORDER BY id DESC
-      LIMIT 100
-    `);
-
     const ranking = await pool.query(`
       SELECT pessoa, COUNT(*) as total
       FROM historico_treinamento
