@@ -62,10 +62,11 @@ app.get("/dashboard", async (req, res) => {
     const ranking = await pool.query(`
       SELECT pessoa, COUNT(*) as total
       FROM historico_treinamento
+      WHERE tipo NOT IN ('Pulada')
       GROUP BY pessoa
       ORDER BY total DESC
       LIMIT 10
-    `);
+      `);
 
     res.json({
       fila: filaTreinamento.rows,
