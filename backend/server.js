@@ -52,16 +52,28 @@ app.get("/dashboard", async (req, res) => {
     }
 
     const historicoTreinamento = await pool.query(`
-      SELECT *
+      SELECT
+        pessoa,
+        cliente,
+        tipo,
+        motivo,
+        data_inicio,
+        data_fim
       FROM historico_treinamento
       WHERE tipo != 'Pulada'
       ORDER BY id DESC
       LIMIT 5
-      `);
+    `);
 
-    const historicoManutencao = await pool.query(
-      "SELECT * FROM historico_manutencao ORDER BY id DESC LIMIT 50",
-    );
+    const historicoManutencao = await pool.query(`
+      SELECT
+        pessoa,
+        equipamento,
+        data
+      FROM historico_manutencao
+      ORDER BY id DESC
+      LIMIT 5
+    `);
 
     const ranking = await pool.query(`
       SELECT pessoa, COUNT(*) as total
@@ -242,23 +254,46 @@ app.post("/manutencao", async (req, res) => {
 app.get("/historico/completo", async (req, res) => {
   try {
     const treinamentos = await pool.query(`
-      SELECT *
+      SELECT
+        pessoa,
+        cliente,
+        tipo,
+        data_inicio,
+        data_fim
       FROM historico_treinamento
       WHERE tipo != 'Pulada'
       ORDER BY id DESC
+      LIMIT 100
     `);
 
     const puladas = await pool.query(`
-      SELECT *
+      SELECT
+        pessoa,
+        cliente,
+        tipo,
+        data_inicio,
+        data_fim
       FROM historico_treinamento
       WHERE tipo = 'Pulada'
       ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const manutencao = await pool.query(`
+      SELECT
+        pessoa,
+        equipamento,
+        data
+      FROM historico_manutencao
+      ORDER BY id DESC
+      LIMIT 100
     `);
 
     const manutencao = await pool.query(`
       SELECT *
       FROM historico_manutencao
       ORDER BY id DESC
+      LIMIT 100
     `);
 
     const ranking = await pool.query(`
