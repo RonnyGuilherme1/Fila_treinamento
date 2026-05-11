@@ -24,35 +24,62 @@ function formatarDuracao(inicio, fim) {
 }
 
 async function carregarHistorico() {
-  const data = await fetch(`${API}/historico/completo`).then((r) => r.json());
+  const inicio = document.getElementById("dataInicio")?.value || "";
+  const fim = document.getElementById("dataFim")?.value || "";
 
-  document.getElementById("tbTreinamentos").innerHTML = data.treinamentos
-    .map(
-      (h) => `
+  let url = `${API}/historico/completo`;
+
+  // Adicionar filtro na URL
+  if (inicio && fim) {
+    url += `?inicio=${inicio}&fim=${fim}`;
+  }
+
+  const data = await fetch(url).then((r) => r.json());
+
+  // =============================
+  // TREINAMENTOS
+  // =============================
+  document.getElementById("tbTreinamentos").innerHTML = data.treinamentos.length
+    ? data.treinamentos
+        .map(
+          (h) => `
+            <tr>
+              <td>${h.pessoa || "-"}</td>
+              <td>${h.cliente || "-"}</td>
+              <td>${h.tipo || "-"}</td>
+              <td>${formatarData(h.data_inicio)}</td>
+              <td>${formatarDuracao(h.data_inicio, h.data_fim)}</td>
+            </tr>
+          `,
+        )
+        .join("")
+    : `
+        <tr>
+          <td colspan="5">Nenhum treinamento encontrado.</td>
+        </tr>
+      `;
+
+  // =============================
+  // PULADAS
+  // =============================
+  document.getElementById("tbPuladas").innerHTML = data.puladas.length
+    ? data.puladas
+        .map(
+          (h) => `
+          <tr>
+            <td>${h.pessoa || "-"}</td>
+            <td>${h.motivo || "-"}</td>
+            <td>${formatarData(h.data_inicio)}</td>
+          </tr>
+        `,
+        )
+        .join("")
+    : `
       <tr>
-        <td>${h.pessoa}</td>
-        <td>${h.cliente || "-"}</td>
-        <td>${h.tipo}</td>
-        <td>${formatarData(h.data_inicio)}</td>
-        <td>${formatarDuracao(h.data_inicio, h.data_fim)}</td>
+        <td colspan="3">Nenhuma chamada pulada encontrada.</td>
       </tr>
-    `,
-    )
-    .join("");
-
-  document.getElementById("tbPuladas").innerHTML = data.puladas
-    .map(
-      (h) => `
-    <tr>
-      <td>${h.pessoa || "-"}</td>
-      <td>${h.motivo || "-"}</td>
-      <td>${formatarData(h.data_inicio)}</td>
-    </tr>
-  `,
-    )
-    .join("");
+    `;
 }
-
 function baixarCSV(tipo) {
   let tabela;
 

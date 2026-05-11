@@ -253,6 +253,17 @@ app.post("/manutencao", async (req, res) => {
 // =============================
 app.get("/historico/completo", async (req, res) => {
   try {
+    const { inicio, fim } = req.query;
+
+    let filtroData = "";
+
+    if (inicio && fim) {
+      filtroData = `
+        AND DATE(data_inicio)
+        BETWEEN '${inicio}' AND '${fim}'
+      `;
+    }
+
     const treinamentos = await pool.query(`
       SELECT
         pessoa,
@@ -262,6 +273,7 @@ app.get("/historico/completo", async (req, res) => {
         data_fim
       FROM historico_treinamento
       WHERE tipo != 'Pulada'
+      ${filtroData}
       ORDER BY id DESC
       LIMIT 100
     `);
@@ -273,6 +285,7 @@ app.get("/historico/completo", async (req, res) => {
         data_inicio
       FROM historico_treinamento
       WHERE tipo = 'Pulada'
+      ${filtroData}
       ORDER BY id DESC
       LIMIT 100
     `);
@@ -291,6 +304,7 @@ app.get("/historico/completo", async (req, res) => {
       SELECT pessoa, COUNT(*) as total
       FROM historico_treinamento
       WHERE tipo != 'Pulada'
+      ${filtroData}
       GROUP BY pessoa
       ORDER BY total DESC
     `);
