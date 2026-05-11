@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Histórico</title>
+
+    <link rel="stylesheet" href="historico.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="topo">
+        <h1>Histórico Completo</h1>
+
+        <button class="voltar" onclick="window.location.href = '../index.html'">
+          ← Voltar
+        </button>
+      </div>
+
+      <div class="acoes-historico">
+        <button class="btn-treinamentos" onclick="baixarCSV('treinamentos')">
+          Baixar Treinamentos
+        </button>
+
+        <button class="btn-puladas" onclick="baixarCSV('puladas')">
+          Baixar Puladas
+        </button>
+      </div>
+
+      <!-- TREINAMENTOS -->
+      <div class="secao">
+        <h2>Treinamentos</h2>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Pessoa</th>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                <th>Data</th>
+                <th>Duração</th>
+              </tr>
+            </thead>
+
+            <tbody id="tbTreinamentos"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PULADAS -->
+      <div class="secao">
+        <h2>Puladas</h2>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Pessoa</th>
+                <th>Motivo</th>
+                <th>Data</th>
+              </tr>
+            </thead>
+
+            <tbody id="tbPuladas"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script src="historico.js"></script>
+  </body>
+</html>

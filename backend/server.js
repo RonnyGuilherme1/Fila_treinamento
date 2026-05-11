@@ -51,9 +51,13 @@ app.get("/dashboard", async (req, res) => {
       console.error("Erro atendimentos:", err.message);
     }
 
-    const historicoTreinamento = await pool.query(
-      "SELECT * FROM historico_treinamento ORDER BY id DESC LIMIT 50",
-    );
+    const historicoTreinamento = await pool.query(`
+      SELECT *
+      FROM historico_treinamento
+      WHERE tipo != 'Pulada'
+      ORDER BY id DESC
+      LIMIT 5
+      `);
 
     const historicoManutencao = await pool.query(
       "SELECT * FROM historico_manutencao ORDER BY id DESC LIMIT 50",
@@ -230,6 +234,51 @@ app.post("/manutencao", async (req, res) => {
   );
 
   res.send("ok");
+});
+
+// =============================
+// HISTÓRICO COMPLETO
+// =============================
+app.get("/historico/completo", async (req, res) => {
+  try {
+    const treinamentos = await pool.query(`
+      SELECT *
+      FROM historico_treinamento
+      WHERE tipo != 'Pulada'
+      ORDER BY id DESC
+    `);
+
+    const puladas = await pool.query(`
+      SELECT *
+      FROM historico_treinamento
+      WHERE tipo = 'Pulada'
+      ORDER BY id DESC
+    `);
+
+    const manutencao = await pool.query(`
+      SELECT *
+      FROM historico_manutencao
+      ORDER BY id DESC
+    `);
+
+    const ranking = await pool.query(`
+      SELECT pessoa, COUNT(*) as total
+      FROM historico_treinamento
+      WHERE tipo != 'Pulada'
+      GROUP BY pessoa
+      ORDER BY total DESC
+    `);
+
+    res.json({
+      treinamentos: treinamentos.rows,
+      puladas: puladas.rows,
+      manutencao: manutencao.rows,
+      ranking: ranking.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
