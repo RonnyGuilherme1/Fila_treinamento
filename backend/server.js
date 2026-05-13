@@ -236,6 +236,40 @@ app.post("/fila/manutencao/rotacionar", async (req, res) => {
   res.send("ok");
 });
 
+// PULAR MANUTENÇÃO
+app.post("/fila/manutencao/pular", async (req, res) => {
+  const { motivo = "Não especificado" } = req.body;
+
+  const r = await pool.query("SELECT * FROM fila_manutencao ORDER BY posicao");
+
+  if (r.rows.length < 2) {
+    return res.send("ok");
+  }
+
+  const first = r.rows[0];
+  const second = r.rows[1];
+
+  await pool.query("UPDATE fila_manutencao SET posicao = 2 WHERE id = $1", [
+    first.id,
+  ]);
+
+  await pool.query("UPDATE fila_manutencao SET posicao = 1 WHERE id = $1", [
+    second.id,
+  ]);
+
+  // registra no histórico
+  await pool.query(
+    `INSERT INTO historico_manutencao (
+      pessoa,
+      equipamento,
+      data_inicio
+    ) VALUES ($1, $2, NOW())`,
+    [first.nome, `PULADO - ${motivo}`],
+  );
+
+  res.send("ok");
+});
+
 // MANUTENÇÃO FINALIZADA
 app.post("/manutencao", async (req, res) => {
   const { pessoa, equipamento } = req.body;

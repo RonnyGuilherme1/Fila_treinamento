@@ -197,11 +197,19 @@ async function confirmarFinalizacao() {
 // =============================
 async function pularTreinamento() {
   const fila = await fetch(`${API}/fila/treinamento`).then((r) => r.json());
-  if (!fila.length) return alert("Fila vazia");
+
+  if (!fila.length) {
+    return alert("Fila vazia");
+  }
 
   pessoaSendoPulada = fila[0].nome;
+
   document.getElementById("inputMotivoPular").value = "";
+
   document.getElementById("modalPular").classList.remove("hidden");
+
+  // identifica qual fila está sendo pulada
+  document.getElementById("modalPular").dataset.tipo = "treinamento";
 }
 
 // =============================
@@ -210,17 +218,48 @@ async function pularTreinamento() {
 async function confirmarPular() {
   const motivo = document.getElementById("inputMotivoPular").value.trim();
 
-  if (!motivo) return alert("Informe o motivo");
+  if (!motivo) {
+    return alert("Informe o motivo");
+  }
+
+  const tipo = document.getElementById("modalPular").dataset.tipo;
 
   fecharModalPular();
 
-  await fetch(`${API}/fila/treinamento/pular`, {
+  const rota =
+    tipo === "manutencao"
+      ? `${API}/fila/manutencao/pular`
+      : `${API}/fila/treinamento/pular`;
+
+  await fetch(rota, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ motivo }),
   });
 
   atualizar();
+}
+
+// =============================
+// PULAR MANUTENÇÃO - ABRIR MODAL
+// =============================
+async function pularManutencao() {
+  const fila = await fetch(`${API}/fila/manutencao`).then((r) => r.json());
+
+  if (!fila.length) {
+    return alert("Fila vazia");
+  }
+
+  pessoaSendoPulada = fila[0].nome;
+
+  document.getElementById("inputMotivoPular").value = "";
+
+  document.getElementById("modalPular").classList.remove("hidden");
+
+  // identifica qual fila está sendo pulada
+  document.getElementById("modalPular").dataset.tipo = "manutencao";
 }
 
 // =============================
