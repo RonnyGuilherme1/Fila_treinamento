@@ -5,9 +5,8 @@ const API = (() => {
   const local = host === "localhost" || host === "127.0.0.1";
 
   if (local) return "http://localhost:3000";
-  if (window.location.protocol === "file:") return "https://fila-treinamento.onrender.com";
 
-  return window.location.origin;
+  return "https://fila-treinamento.onrender.com";
 })();
 
 const TIPO_CORES = {
@@ -29,6 +28,18 @@ function escapeHTML(valor) {
     .replace(/'/g, "&#039;");
 }
 
+async function lerMensagemErro(res, fallback) {
+  const texto = await res.text().catch(() => "");
+  if (!texto) return fallback;
+
+  try {
+    const erro = JSON.parse(texto);
+    return erro.erro || erro.error || erro.message || fallback;
+  } catch (_err) {
+    return texto;
+  }
+}
+
 async function requestJSON(endpoint, options = {}) {
   const res = await fetch(`${API}${endpoint}`, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -36,13 +47,7 @@ async function requestJSON(endpoint, options = {}) {
   });
 
   if (!res.ok) {
-    let mensagem = "Erro na comunicação com o servidor.";
-    try {
-      const erro = await res.json();
-      mensagem = erro.erro || erro.error || mensagem;
-    } catch (_err) {
-      mensagem = (await res.text()) || mensagem;
-    }
+    const mensagem = await lerMensagemErro(res, "Erro na comunicação com o servidor.");
     throw new Error(mensagem);
   }
 

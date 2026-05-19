@@ -5,9 +5,8 @@ const API = (() => {
   const local = host === "localhost" || host === "127.0.0.1";
 
   if (local) return "http://localhost:3000";
-  if (window.location.protocol === "file:") return "https://fila-treinamento.onrender.com";
 
-  return window.location.origin;
+  return "https://fila-treinamento.onrender.com";
 })();
 
 function escapeHTML(valor) {
@@ -19,9 +18,26 @@ function escapeHTML(valor) {
     .replace(/'/g, "&#039;");
 }
 
+async function lerMensagemErro(res, fallback) {
+  const texto = await res.text().catch(() => "");
+  if (!texto) return fallback;
+
+  try {
+    const erro = JSON.parse(texto);
+    return erro.erro || erro.error || erro.message || fallback;
+  } catch (_err) {
+    return texto;
+  }
+}
+
 async function requestJSON(endpoint) {
   const res = await fetch(`${API}${endpoint}`);
-  if (!res.ok) throw new Error("Erro ao carregar painel.");
+
+  if (!res.ok) {
+    const mensagem = await lerMensagemErro(res, "Erro ao carregar painel.");
+    throw new Error(mensagem);
+  }
+
   return res.json();
 }
 
