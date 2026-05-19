@@ -2,6 +2,7 @@
 <html lang="pt-br">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Conecta - Controle</title>
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -9,23 +10,43 @@
   <body>
     <div class="layout">
       <aside class="sidebar">
-        <h2>Conecta</h2>
+        <div class="brand">
+          <strong>Conecta</strong>
+          <span>Controle de filas</span>
+        </div>
 
-        <button onclick="trocarAba('treinamento')">📚 Treinamento</button>
-        <button onclick="trocarAba('manutencao')">🛠️ Manutenção</button>
-        <button onclick="window.location.href = 'historico/historico.html'">
-          📋 Histórico
-        </button>
-        <button onclick="window.open('tv/tv.html')">📺 Painel TV</button>
+        <nav class="menu" aria-label="Navegação principal">
+          <button class="nav-button active" data-tab="treinamento" onclick="trocarAba('treinamento')">
+            <span>Treinamento</span>
+          </button>
+          <button class="nav-button" data-tab="manutencao" onclick="trocarAba('manutencao')">
+            <span>Manutenção</span>
+          </button>
+          <button class="nav-button" onclick="window.location.href = 'historico/historico.html'">
+            <span>Histórico</span>
+          </button>
+          <button class="nav-button" onclick="window.open('tv/tv.html')">
+            <span>Painel TV</span>
+          </button>
+        </nav>
       </aside>
 
       <main class="content">
-        <h1 id="titulo">Treinamento</h1>
+        <header class="page-header">
+          <div>
+            <span class="eyebrow">Operação</span>
+            <h1 id="titulo">Treinamento</h1>
+          </div>
+          <p>Controle simples para chamada, atendimento e histórico da equipe.</p>
+        </header>
 
         <!-- TREINAMENTO -->
         <section id="treinamento" class="aba ativa">
           <div class="painel-atendimento">
-            <h2>Em Treinamento</h2>
+            <div class="section-title">
+              <span>Agora</span>
+              <h2>Em treinamento</h2>
+            </div>
             <div id="atendendoAgora" class="atendimentos-container">-</div>
           </div>
 
@@ -33,36 +54,46 @@
             <div class="card queue-card fila-card" tabindex="0">
               <div class="fila-card-header">
                 <div class="fila-card-title">
-                  <h3>Próximo</h3>
+                  <span>Próximo da fila</span>
                   <p id="proximoTreinamento" class="proximo-nome">-</p>
                 </div>
               </div>
               <div class="fila-completa">
+                <p class="fila-indicator">Fila completa</p>
                 <ul id="filaTreinamentoHover"></ul>
               </div>
             </div>
             <div class="card total-card">
-              <h3>Total</h3>
+              <span>Total na fila</span>
               <p id="totalTreinamento">0</p>
             </div>
           </div>
 
-          <div class="acao">
-            <input id="clienteTreinamento" placeholder="Cliente" />
-            <select id="tipoTreinamento">
-              <option value="1° treinamento">1° treinamento</option>
-              <option value="2° treinamento">2° treinamento</option>
-              <option value="3° treinamento">3° treinamento</option>
-              <option value="Treinamento/Dúvidas">Treinamento/Dúvidas</option>
-            </select>
+          <div class="acao card-action">
+            <div class="field-group field-grow">
+              <label for="clienteTreinamento">Cliente</label>
+              <input id="clienteTreinamento" placeholder="Nome do cliente" maxlength="120" autocomplete="off" />
+            </div>
+            <div class="field-group field-medium">
+              <label for="tipoTreinamento">Tipo</label>
+              <select id="tipoTreinamento">
+                <option value="1° treinamento">1° treinamento</option>
+                <option value="2° treinamento">2° treinamento</option>
+                <option value="3° treinamento">3° treinamento</option>
+                <option value="Treinamento/Dúvidas">Treinamento/Dúvidas</option>
+              </select>
+            </div>
             <button onclick="chamarTreinamento()">Iniciar</button>
             <button class="warning" onclick="pularTreinamento()">Pular</button>
-            <button class="danger" onclick="atualizar()">Atualizar</button>
+            <button class="secondary" onclick="atualizar()">Atualizar</button>
           </div>
 
           <div class="grid">
             <div class="box full-width-box">
-              <h3>Histórico</h3>
+              <div class="box-header">
+                <h3>Histórico recente</h3>
+                <span>Últimos atendimentos</span>
+              </div>
               <div class="scroll">
                 <table>
                   <thead>
@@ -79,8 +110,11 @@
                 </table>
               </div>
 
-              <h3>Ranking</h3>
-              <div class="scroll">
+              <div class="box-header ranking-header">
+                <h3>Ranking</h3>
+                <span>Quantidade por pessoa</span>
+              </div>
+              <div class="scroll small-scroll">
                 <table>
                   <thead>
                     <tr>
@@ -97,26 +131,41 @@
 
         <!-- MANUTENÇÃO -->
         <section id="manutencao" class="aba">
-          <h2>Manutenção</h2>
+          <div class="cards cards-top">
+            <div class="card queue-card fila-card" tabindex="0">
+              <div class="fila-card-header">
+                <div class="fila-card-title">
+                  <span>Próximo da fila</span>
+                  <p id="proximoManutencao" class="proximo-nome">-</p>
+                </div>
+              </div>
+              <div class="fila-completa">
+                <p class="fila-indicator">Fila completa</p>
+                <ul id="filaManutencao"></ul>
+              </div>
+            </div>
+            <div class="card total-card">
+              <span>Total na fila</span>
+              <p id="totalManutencao">0</p>
+            </div>
+          </div>
 
-          <div class="acao">
-            <input id="equipamento" placeholder="N° Equipamento" />
-
+          <div class="acao card-action">
+            <div class="field-group field-grow">
+              <label for="equipamento">Equipamento</label>
+              <input id="equipamento" placeholder="Nº do equipamento" inputmode="numeric" maxlength="80" autocomplete="off" />
+            </div>
             <button onclick="chamarManutencao()">Finalizar</button>
-
             <button class="warning" onclick="pularManutencao()">Pular</button>
-
-            <button class="danger" onclick="atualizar()">Atualizar</button>
+            <button class="secondary" onclick="atualizar()">Atualizar</button>
           </div>
 
           <div class="grid">
-            <div class="box">
-              <h3>Fila</h3>
-              <ul id="filaManutencao"></ul>
-            </div>
-
-            <div class="box">
-              <h3>Histórico</h3>
+            <div class="box full-width-box">
+              <div class="box-header">
+                <h3>Histórico recente</h3>
+                <span>Últimas manutenções</span>
+              </div>
               <div class="scroll">
                 <table>
                   <thead>
@@ -134,32 +183,29 @@
         </section>
       </main>
     </div>
-    <div id="modalFinalizar" class="modal hidden">
+
+    <div id="modalFinalizar" class="modal hidden" role="dialog" aria-modal="true">
       <div class="modal-content">
-        <h2>Finalizar Atendimento</h2>
-
+        <h2>Finalizar atendimento</h2>
         <p id="modalTexto">-</p>
-
-        <button onclick="confirmarFinalizacao()">Finalizar</button>
-        <button onclick="fecharModal()">Cancelar</button>
+        <div class="modal-actions">
+          <button onclick="confirmarFinalizacao()">Finalizar</button>
+          <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+        </div>
       </div>
     </div>
 
-    <div id="modalPular" class="modal hidden">
+    <div id="modalPular" class="modal hidden" role="dialog" aria-modal="true">
       <div class="modal-content modal-pular">
-        <h2>Motivo da Pulada</h2>
-
+        <h2>Motivo da pulada</h2>
         <textarea
           id="inputMotivoPular"
-          placeholder="Digite o motivo pela qual está pulando a vez..."
+          placeholder="Digite o motivo para pular a vez..."
           maxlength="150"
         ></textarea>
-
         <div class="modal-actions">
           <button class="btn-primary" onclick="confirmarPular()">Pular</button>
-          <button class="btn-secondary" onclick="fecharModalPular()">
-            Cancelar
-          </button>
+          <button class="btn-secondary" onclick="fecharModalPular()">Cancelar</button>
         </div>
       </div>
     </div>

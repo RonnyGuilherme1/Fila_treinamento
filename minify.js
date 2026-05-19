@@ -1,50 +1,59 @@
 const fs = require("fs");
 const path = require("path");
+const UglifyJS = require("./Frontend/node_modules/uglify-js");
+const CleanCSS = require("./Frontend/node_modules/clean-css");
 
-// Simple minifier function
-function minifyJS(code) {
-  return code
-    .replace(/\/\*[\s\S]*?\*\//g, "") // Remove block comments
-    .replace(/\/\/.*/g, "") // Remove line comments
-    .replace(/\s+/g, " ") // Collapse whitespace
-    .replace(/\s*([{}();:,])\s*/g, "$1") // Remove spaces around symbols
-    .trim();
+function minifyJSFile(source, target) {
+  const code = fs.readFileSync(source, "utf-8");
+  const result = UglifyJS.minify(code, {
+    compress: true,
+    mangle: true,
+  });
+
+  if (result.error) throw result.error;
+
+  fs.writeFileSync(target, result.code);
+  console.log(`✓ ${path.relative(__dirname, target)} criado`);
 }
 
-function minifyCSS(code) {
-  return code
-    .replace(/\/\*[\s\S]*?\*\//g, "") // Remove comments
-    .replace(/\s+/g, " ") // Collapse whitespace
-    .replace(/\s*([{}:;,])\s*/g, "$1") // Remove spaces around symbols
-    .trim();
+function minifyCSSFile(source, target) {
+  const code = fs.readFileSync(source, "utf-8");
+  const result = new CleanCSS({ level: 2 }).minify(code);
+
+  if (result.errors.length) throw new Error(result.errors.join("\n"));
+
+  fs.writeFileSync(target, result.styles);
+  console.log(`✓ ${path.relative(__dirname, target)} criado`);
 }
 
-// Minify script.js
-const scriptPath = path.join(__dirname, "Frontend", "script.js");
-const scriptMinPath = path.join(__dirname, "Frontend", "script.min.js");
-const scriptCode = fs.readFileSync(scriptPath, "utf-8");
-fs.writeFileSync(scriptMinPath, minifyJS(scriptCode));
-console.log("✓ script.min.js criado");
+minifyJSFile(
+  path.join(__dirname, "Frontend", "script.js"),
+  path.join(__dirname, "Frontend", "script.min.js"),
+);
 
-// Minify style.css
-const stylePath = path.join(__dirname, "Frontend", "style.css");
-const styleMinPath = path.join(__dirname, "Frontend", "style.min.css");
-const styleCode = fs.readFileSync(stylePath, "utf-8");
-fs.writeFileSync(styleMinPath, minifyCSS(styleCode));
-console.log("✓ style.min.css criado");
+minifyCSSFile(
+  path.join(__dirname, "Frontend", "style.css"),
+  path.join(__dirname, "Frontend", "style.min.css"),
+);
 
-// Minify tv.js
-const tvPath = path.join(__dirname, "Frontend", "tv", "tv.js");
-const tvMinPath = path.join(__dirname, "Frontend", "tv", "tv.min.js");
-const tvCode = fs.readFileSync(tvPath, "utf-8");
-fs.writeFileSync(tvMinPath, minifyJS(tvCode));
-console.log("✓ tv.min.js criado");
+minifyJSFile(
+  path.join(__dirname, "Frontend", "historico", "historico.js"),
+  path.join(__dirname, "Frontend", "historico", "historico.min.js"),
+);
 
-// Minify tv.css
-const tvCssPath = path.join(__dirname, "Frontend", "tv", "tv.css");
-const tvCssMinPath = path.join(__dirname, "Frontend", "tv", "tv.min.css");
-const tvCssCode = fs.readFileSync(tvCssPath, "utf-8");
-fs.writeFileSync(tvCssMinPath, minifyCSS(tvCssCode));
-console.log("✓ tv.min.css criado");
+minifyCSSFile(
+  path.join(__dirname, "Frontend", "historico", "historico.css"),
+  path.join(__dirname, "Frontend", "historico", "historico.min.css"),
+);
 
-console.log("\n✓ Todos os arquivos foram minificados com sucesso!");
+minifyJSFile(
+  path.join(__dirname, "Frontend", "tv", "tv.js"),
+  path.join(__dirname, "Frontend", "tv", "tv.min.js"),
+);
+
+minifyCSSFile(
+  path.join(__dirname, "Frontend", "tv", "tv.css"),
+  path.join(__dirname, "Frontend", "tv", "tv.min.css"),
+);
+
+console.log("\n✓ Todos os arquivos foram minificados com segurança.");

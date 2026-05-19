@@ -1,122 +1,190 @@
-const API =
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
-    ? "http://localhost:3000"
-    : "https://fila-treinamento.onrender.com";
+const API = (() => {
+  if (window.FILA_API_URL) return window.FILA_API_URL.replace(/\/$/, "");
+
+  const host = window.location.hostname;
+  const local = host === "localhost" || host === "127.0.0.1";
+
+  if (local) return "http://localhost:3000";
+  if (window.location.protocol === "file:") return "https://fila-treinamento.onrender.com";
+
+  return window.location.origin;
+})();
+
+function escapeHTML(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+async function requestJSON(endpoint) {
+  const res = await fetch(`${API}${endpoint}`);
+
+  if (!res.ok) {
+    let mensagem = "Erro ao carregar histórico.";
+    try {
+      const erro = await res.json();
+      mensagem = erro.erro || erro.error || mensagem;
+    } catch (_err) {
+      mensagem = (await res.text()) || mensagem;
+    }
+    throw new Error(mensagem);
+  }
+
+  return res.json();
+}
 
 function formatarData(dataStr) {
   if (!dataStr) return "-";
 
   const data = new Date(dataStr);
+  if (Number.isNaN(data.getTime())) return "-";
 
-  return data.toLocaleString("pt-BR");
+  return data.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function formatarDuracao(inicio, fim) {
   if (!inicio || !fim) return "-";
 
   const diff = new Date(fim) - new Date(inicio);
+  if (Number.isNaN(diff) || diff < 0) return "-";
 
   const segundos = Math.floor(diff / 1000);
   const minutos = Math.floor(segundos / 60);
+  const horas = Math.floor(minutos / 60);
 
+  if (horas > 0) return `${horas}h ${minutos % 60}m`;
   return `${minutos}m ${segundos % 60}s`;
 }
 
 function limparFiltro() {
   document.getElementById("dataInicio").value = "";
   document.getElementById("dataFim").value = "";
-
   carregarHistorico();
+}
+
+function setTexto(id, valor) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = valor;
+}
+
+function renderTreinamentos(lista) {
+  if (!lista.length) return `<tr><td colspan="5" class="empty-cell">Nenhum treinamento encontrado.</td></tr>`;
+
+  return lista
+    .map(
+      (h) => `
+        <tr>
+          <td>${escapeHTML(h.pessoa || "-")}</td>
+          <td>${escapeHTML(h.cliente || "-")}</td>
+          <td>${escapeHTML(h.tipo || "-")}</td>
+          <td>${formatarData(h.data_inicio)}</td>
+          <td>${formatarDuracao(h.data_inicio, h.data_fim)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+}
+
+function renderPuladas(lista) {
+  if (!lista.length) return `<tr><td colspan="3" class="empty-cell">Nenhuma chamada pulada encontrada.</td></tr>`;
+
+  return lista
+    .map(
+      (h) => `
+        <tr>
+          <td>${escapeHTML(h.pessoa || "-")}</td>
+          <td>${escapeHTML(h.motivo || "-")}</td>
+          <td>${formatarData(h.data_inicio)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+}
+
+function renderManutencao(lista) {
+  if (!lista.length) return `<tr><td colspan="3" class="empty-cell">Nenhuma manutenção encontrada.</td></tr>`;
+
+  return lista
+    .map(
+      (h) => `
+        <tr>
+          <td>${escapeHTML(h.pessoa || "-")}</td>
+          <td>${escapeHTML(h.equipamento || "-")}</td>
+          <td>${formatarData(h.data)}</td>
+        </tr>
+      `,
+    )
+    .join("");
 }
 
 async function carregarHistorico() {
   const inicio = document.getElementById("dataInicio")?.value || "";
   const fim = document.getElementById("dataFim")?.value || "";
 
-  let url = `${API}/historico/completo`;
+  let url = "/historico/completo";
+  if (inicio && fim) url += `?inicio=${inicio}&fim=${fim}`;
 
-  // Adicionar filtro na URL
-  if (inicio && fim) {
-    url += `?inicio=${inicio}&fim=${fim}`;
+  try {
+    const data = await requestJSON(url);
+
+    const treinamentos = data.treinamentos || [];
+    const puladas = data.puladas || [];
+    const manutencao = data.manutencao || [];
+    const ranking = data.ranking || [];
+
+    document.getElementById("tbTreinamentos").innerHTML = renderTreinamentos(treinamentos);
+    document.getElementById("tbPuladas").innerHTML = renderPuladas(puladas);
+    document.getElementById("tbManutencao").innerHTML = renderManutencao(manutencao);
+
+    setTexto("totalTreinamentos", treinamentos.length);
+    setTexto("totalPuladas", puladas.length);
+    setTexto("totalManutencao", manutencao.length);
+    setTexto("totalRanking", ranking.length);
+  } catch (err) {
+    console.error(err);
+    document.getElementById("tbTreinamentos").innerHTML = `<tr><td colspan="5" class="empty-cell">${escapeHTML(err.message)}</td></tr>`;
   }
-
-  const data = await fetch(url).then((r) => r.json());
-
-  // =============================
-  // TREINAMENTOS
-  // =============================
-  document.getElementById("tbTreinamentos").innerHTML = data.treinamentos.length
-    ? data.treinamentos
-        .map(
-          (h) => `
-            <tr>
-              <td>${h.pessoa || "-"}</td>
-              <td>${h.cliente || "-"}</td>
-              <td>${h.tipo || "-"}</td>
-              <td>${formatarData(h.data_inicio)}</td>
-              <td>${formatarDuracao(h.data_inicio, h.data_fim)}</td>
-            </tr>
-          `,
-        )
-        .join("")
-    : `
-        <tr>
-          <td colspan="5">Nenhum treinamento encontrado.</td>
-        </tr>
-      `;
-
-  // =============================
-  // PULADAS
-  // =============================
-  document.getElementById("tbPuladas").innerHTML = data.puladas.length
-    ? data.puladas
-        .map(
-          (h) => `
-          <tr>
-            <td>${h.pessoa || "-"}</td>
-            <td>${h.motivo || "-"}</td>
-            <td>${formatarData(h.data_inicio)}</td>
-          </tr>
-        `,
-        )
-        .join("")
-    : `
-      <tr>
-        <td colspan="3">Nenhuma chamada pulada encontrada.</td>
-      </tr>
-    `;
 }
+
 function baixarCSV(tipo) {
-  let tabela;
+  const ids = {
+    treinamentos: "tbTreinamentos",
+    puladas: "tbPuladas",
+    manutencao: "tbManutencao",
+  };
 
-  if (tipo === "treinamentos") {
-    tabela = document.getElementById("tbTreinamentos");
-  } else {
-    tabela = document.getElementById("tbPuladas");
-  }
+  const tabela = document.getElementById(ids[tipo]);
+  if (!tabela) return;
 
-  let csv = [];
+  const linhas = [];
 
   tabela.querySelectorAll("tr").forEach((row) => {
     const cols = row.querySelectorAll("td");
+    if (!cols.length) return;
 
-    const linha = [...cols].map((c) => c.innerText).join(";");
+    const linha = [...cols]
+      .map((c) => `"${c.innerText.replaceAll('"', '""')}"`)
+      .join(";");
 
-    csv.push(linha);
+    linhas.push(linha);
   });
 
-  const blob = new Blob([csv.join("\n")], {
-    type: "text/csv;charset=utf-8;",
-  });
-
+  const blob = new Blob([linhas.join("\n")], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
 
   link.href = URL.createObjectURL(blob);
-
   link.download = `${tipo}.csv`;
-
   link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 carregarHistorico();

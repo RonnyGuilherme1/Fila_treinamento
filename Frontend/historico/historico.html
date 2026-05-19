@@ -3,53 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <title>Histórico</title>
-
+    <title>Histórico - Conecta</title>
     <link rel="stylesheet" href="historico.css" />
   </head>
 
   <body>
     <div class="container">
-      <div class="topo">
-        <h1>Histórico Completo</h1>
+      <header class="topo">
+        <div>
+          <span class="eyebrow">Relatórios</span>
+          <h1>Histórico completo</h1>
+          <p>Consulte treinamentos, puladas e manutenções registradas.</p>
+        </div>
+        <button class="voltar" onclick="window.location.href = '../index.html'">← Voltar</button>
+      </header>
 
-        <button class="voltar" onclick="window.location.href = '../index.html'">
-          ← Voltar
-        </button>
-      </div>
+      <section class="cards" aria-label="Resumo do histórico">
+        <div class="card treinamentos">
+          <h3>Treinamentos</h3>
+          <p id="totalTreinamentos">0</p>
+        </div>
+        <div class="card puladas">
+          <h3>Puladas</h3>
+          <p id="totalPuladas">0</p>
+        </div>
+        <div class="card manutencao">
+          <h3>Manutenções</h3>
+          <p id="totalManutencao">0</p>
+        </div>
+        <div class="card ranking">
+          <h3>Ranking</h3>
+          <p id="totalRanking">0</p>
+        </div>
+      </section>
 
-      <div class="acoes-historico">
-        <button class="btn-treinamentos" onclick="baixarCSV('treinamentos')">
-          Baixar Treinamentos
-        </button>
+      <section class="toolbar">
+        <div class="filtros">
+          <div class="campo-filtro">
+            <label for="dataInicio">Data inicial</label>
+            <input type="date" id="dataInicio" />
+          </div>
 
-        <button class="btn-puladas" onclick="baixarCSV('puladas')">
-          Baixar Puladas
-        </button>
-      </div>
+          <div class="campo-filtro">
+            <label for="dataFim">Data final</label>
+            <input type="date" id="dataFim" />
+          </div>
 
-      <div class="filtros">
-        <div class="campo-filtro">
-          <label>Data Inicial</label>
-          <input type="date" id="dataInicio" />
+          <button class="btn-filtrar" onclick="carregarHistorico()">Filtrar</button>
+          <button class="btn-limpar" onclick="limparFiltro()">Limpar</button>
         </div>
 
-        <div class="campo-filtro">
-          <label>Data Final</label>
-          <input type="date" id="dataFim" />
+        <div class="acoes-historico">
+          <button class="btn-treinamentos" onclick="baixarCSV('treinamentos')">CSV Treinamentos</button>
+          <button class="btn-puladas" onclick="baixarCSV('puladas')">CSV Puladas</button>
+          <button class="btn-manutencao" onclick="baixarCSV('manutencao')">CSV Manutenção</button>
         </div>
+      </section>
 
-        <button class="btn-filtrar" onclick="carregarHistorico()">
-          Filtrar
-        </button>
-        <button class="btn-limpar" onclick="limparFiltro()">Limpar</button>
-      </div>
-
-      <!-- TREINAMENTOS -->
-      <div class="secao">
-        <h2>Treinamentos</h2>
-
+      <section class="secao">
+        <div class="secao-header">
+          <h2>Treinamentos</h2>
+          <span>Atendimentos realizados</span>
+        </div>
         <div class="table-wrapper">
           <table>
             <thead>
@@ -61,20 +76,18 @@
                 <th>Duração</th>
               </tr>
             </thead>
-
             <tbody id="tbTreinamentos">
-              <tr>
-                <td colspan="5">Carregando...</td>
-              </tr>
+              <tr><td colspan="5">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <!-- PULADAS -->
-      <div class="secao">
-        <h2>Puladas</h2>
-
+      <section class="secao">
+        <div class="secao-header">
+          <h2>Puladas</h2>
+          <span>Chamadas puladas com motivo</span>
+        </div>
         <div class="table-wrapper">
           <table>
             <thead>
@@ -84,15 +97,33 @@
                 <th>Data</th>
               </tr>
             </thead>
-
             <tbody id="tbPuladas">
-              <tr>
-                <td colspan="3">Carregando...</td>
-              </tr>
+              <tr><td colspan="3">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
+
+      <section class="secao">
+        <div class="secao-header">
+          <h2>Manutenção</h2>
+          <span>Equipamentos registrados</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Pessoa</th>
+                <th>Equipamento</th>
+                <th>Data</th>
+              </tr>
+            </thead>
+            <tbody id="tbManutencao">
+              <tr><td colspan="3">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
     <script src="historico.js"></script>

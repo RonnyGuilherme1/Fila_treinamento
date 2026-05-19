@@ -2,74 +2,208 @@ const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
 const path = require("path");
+const pool = require("./db");
 
 const app = express();
-app.use(cors({ origin: "*" }));
-app.use(compression());
-app.use(express.json());
 
-// Servir arquivos estáticos com cache
+app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
+app.use(compression());
+app.use(express.json({ limit: "100kb" }));
+
 app.use(
   express.static(path.join(__dirname, "../Frontend"), {
-    maxAge: "1d", // Cache por 1 dia
+    maxAge: "1d",
+    etag: true,
   }),
 );
 
-const pool = require("./db");
+const FILAS = {
+  treinamento: "fila_treinamento",
+  manutencao: "fila_manutencao",
+};
+
+function asyncRoute(handler) {
+  return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+}
+
+function textoObrigatorio(valor, campo, limite = 120) {
+  const texto = String(valor || "").trim();
+
+  if (!texto) {
+    const erro = new Error(`Informe ${campo}.`);
+    erro.status = 400;
+    throw erro;
+  }
+
+  if (texto.length > limite) {
+    const erro = new Error(`${campo} deve ter no máximo ${limite} caracteres.`);
+    erro.status = 400;
+    throw erro;
+  }
+
+  return texto;
+}
+
+function textoOpcional(valor, padrao, limite = 150) {
+  const texto = String(valor || "").trim() || padrao;
+  return texto.slice(0, limite);
+}
+
+function idObrigatorio(valor) {
+  const id = Number(valor);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    const erro = new Error("ID inválido.");
+    erro.status = 400;
+    throw erro;
+  }
+
+  return id;
+}
+
+function validarPeriodo(inicio, fim) {
+  if (!inicio || !fim) return null;
+
+  const padraoData = /^\d{4}-\d{2}-\d{2}$/;
+  if (!padraoData.test(inicio) || !padraoData.test(fim)) {
+    const erro = new Error("Período inválido. Use o formato AAAA-MM-DD.");
+    erro.status = 400;
+    throw erro;
+  }
+
+  return [inicio, fim];
+}
+
+async function listarFila(tipo, client = pool) {
+  const tabela = FILAS[tipo];
+  return client.query(`SELECT * FROM ${tabela} ORDER BY posicao NULLS LAST, id`);
+}
+
+async function rotacionarFila(tipo) {
+  const tabela = FILAS[tipo];
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const r = await client.query(
+      `SELECT * FROM ${tabela} ORDER BY posicao NULLS LAST, id FOR UPDATE`,
+    );
+
+    if (!r.rows.length) {
+      await client.query("COMMIT");
+      return;
+    }
+
+    const [primeiro, ...restante] = r.rows;
+
+    for (let i = 0; i < restante.length; i += 1) {
+      await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
+        i + 1,
+        restante[i].id,
+      ]);
+    }
+
+    await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
+      r.rows.length,
+      primeiro.id,
+    ]);
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function pularFila(tipo, motivo) {
+  const tabela = FILAS[tipo];
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const r = await client.query(
+      `SELECT * FROM ${tabela} ORDER BY posicao NULLS LAST, id FOR UPDATE`,
+    );
+
+    if (r.rows.length < 2) {
+      await client.query("COMMIT");
+      return;
+    }
+
+    const [primeiro, segundo] = r.rows;
+
+    await client.query(`UPDATE ${tabela} SET posicao = 2 WHERE id = $1`, [
+      primeiro.id,
+    ]);
+    await client.query(`UPDATE ${tabela} SET posicao = 1 WHERE id = $1`, [
+      segundo.id,
+    ]);
+
+    if (tipo === "treinamento") {
+      await client.query(
+        `INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio)
+         VALUES ($1, $2, 'Pulada', $3, NOW())`,
+        [primeiro.nome, "Sistema", motivo],
+      );
+    } else {
+      await client.query(
+        `INSERT INTO historico_manutencao (pessoa, equipamento, data)
+         VALUES ($1, $2, NOW())`,
+        [primeiro.nome, `PULADO - ${motivo}`],
+      );
+    }
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
 // =============================
 // DASHBOARD
 // =============================
-app.get("/dashboard", async (req, res) => {
-  try {
-    const filaTreinamento = await pool.query(
-      "SELECT * FROM fila_treinamento ORDER BY posicao",
+app.get(
+  "/dashboard",
+  asyncRoute(async (_req, res) => {
+    const filaTreinamento = await listarFila("treinamento");
+    const filaManutencao = await listarFila("manutencao");
+
+    const atendimentos = await pool.query(
+      `SELECT a.id, a.pessoa, a.cliente, a.fim,
+              COALESCE(
+                (SELECT tipo FROM historico_treinamento
+                 WHERE pessoa = a.pessoa
+                   AND cliente = a.cliente
+                 ORDER BY data_inicio DESC
+                 LIMIT 1),
+                'Treinamento'
+              ) as tipo
+       FROM atendimentos a
+       WHERE a.fim IS NULL
+       ORDER BY a.id DESC`,
     );
-
-    const filaManutencao = await pool.query(
-      "SELECT * FROM fila_manutencao ORDER BY posicao",
-    );
-
-    let atendimentos = { rows: [] };
-
-    try {
-      atendimentos = await pool.query(
-        `SELECT a.id, a.pessoa, a.cliente, a.fim,
-                COALESCE(
-                  (SELECT tipo FROM historico_treinamento
-                   WHERE pessoa = a.pessoa
-                     AND cliente = a.cliente
-                   ORDER BY data_inicio DESC
-                   LIMIT 1),
-                  'Treinamento'
-                ) as tipo
-         FROM atendimentos a
-         WHERE a.fim IS NULL
-         ORDER BY a.id DESC`,
-      );
-    } catch (err) {
-      console.error("Erro atendimentos:", err.message);
-    }
 
     const historicoTreinamento = await pool.query(`
-      SELECT
-        pessoa,
-        cliente,
-        tipo,
-        motivo,
-        data_inicio,
-        data_fim
+      SELECT pessoa, cliente, tipo, motivo, data_inicio, data_fim
       FROM historico_treinamento
-      WHERE tipo != 'Pulada'
+      WHERE tipo <> 'Pulada'
       ORDER BY id DESC
       LIMIT 5
     `);
 
     const historicoManutencao = await pool.query(`
-      SELECT
-        pessoa,
-        equipamento,
-        data
+      SELECT pessoa, equipamento, data
       FROM historico_manutencao
       ORDER BY id DESC
       LIMIT 5
@@ -78,11 +212,11 @@ app.get("/dashboard", async (req, res) => {
     const ranking = await pool.query(`
       SELECT pessoa, COUNT(*) as total
       FROM historico_treinamento
-      WHERE tipo NOT IN ('Pulada')
+      WHERE tipo <> 'Pulada'
       GROUP BY pessoa
-      ORDER BY total DESC
+      ORDER BY total DESC, pessoa ASC
       LIMIT 10
-      `);
+    `);
 
     res.json({
       fila: filaTreinamento.rows,
@@ -92,100 +226,96 @@ app.get("/dashboard", async (req, res) => {
       historicoManut: historicoManutencao.rows,
       ranking: ranking.rows,
     });
-  } catch (err) {
-    console.error("DASHBOARD ERROR:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+  }),
+);
+
 // =============================
 // FILA TREINAMENTO
 // =============================
-app.get("/fila/treinamento", async (req, res) => {
-  const r = await pool.query("SELECT * FROM fila_treinamento ORDER BY posicao");
-  res.json(r.rows);
-});
+app.get(
+  "/fila/treinamento",
+  asyncRoute(async (_req, res) => {
+    const r = await listarFila("treinamento");
+    res.json(r.rows);
+  }),
+);
 
-// ROTACIONAR TREINAMENTO
-app.post("/fila/treinamento/rotacionar", async (req, res) => {
-  const r = await pool.query("SELECT * FROM fila_treinamento ORDER BY posicao");
-  if (!r.rows.length) return res.send("ok");
+app.post(
+  "/fila/treinamento/rotacionar",
+  asyncRoute(async (_req, res) => {
+    await rotacionarFila("treinamento");
+    res.send("ok");
+  }),
+);
 
-  const first = r.rows[0];
-
-  await pool.query("UPDATE fila_treinamento SET posicao = posicao - 1");
-  await pool.query(
-    "UPDATE fila_treinamento SET posicao = (SELECT COALESCE(MAX(posicao),0)+1 FROM fila_treinamento) WHERE id=$1",
-    [first.id],
-  );
-
-  res.send("ok");
-});
-
-// PULAR TREINAMENTO (mover primeiro para segunda posição)
-app.post("/fila/treinamento/pular", async (req, res) => {
-  const { motivo = "Não especificado" } = req.body;
-
-  const r = await pool.query("SELECT * FROM fila_treinamento ORDER BY posicao");
-  if (r.rows.length < 2) return res.send("ok");
-
-  const first = r.rows[0];
-  const second = r.rows[1];
-
-  await pool.query("UPDATE fila_treinamento SET posicao = 2 WHERE id = $1", [
-    first.id,
-  ]);
-  await pool.query("UPDATE fila_treinamento SET posicao = 1 WHERE id = $1", [
-    second.id,
-  ]);
-
-  // Registrar no histórico que foi pulado
-  await pool.query(
-    `INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio)
-     VALUES ($1, $2, 'Pulada', $3, NOW())`,
-    [first.nome, "Sistema", motivo],
-  );
-
-  res.send("ok");
-});
+app.post(
+  "/fila/treinamento/pular",
+  asyncRoute(async (req, res) => {
+    const motivo = textoOpcional(req.body.motivo, "Não especificado", 150);
+    await pularFila("treinamento", motivo);
+    res.send("ok");
+  }),
+);
 
 // =============================
 // ATENDIMENTO TREINAMENTO
 // =============================
-app.post("/atendimento", async (req, res) => {
-  const { pessoa, cliente, tipo = "Atendimento" } = req.body;
+app.post(
+  "/atendimento",
+  asyncRoute(async (req, res) => {
+    const pessoa = textoObrigatorio(req.body.pessoa, "a pessoa", 100);
+    const cliente = textoObrigatorio(req.body.cliente, "o cliente", 120);
+    const tipo = textoOpcional(req.body.tipo, "Atendimento", 60);
 
-  const r = await pool.query(
-    "INSERT INTO atendimentos (pessoa, cliente) VALUES ($1,$2) RETURNING *",
-    [pessoa, cliente],
-  );
+    const client = await pool.connect();
 
-  const atendimento = r.rows[0];
+    try {
+      await client.query("BEGIN");
 
-  await pool.query(
-    `INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio)
-     VALUES ($1,$2,$3,'-',NOW())`,
-    [pessoa, cliente, tipo],
-  );
+      const r = await client.query(
+        "INSERT INTO atendimentos (pessoa, cliente) VALUES ($1, $2) RETURNING *",
+        [pessoa, cliente],
+      );
 
-  res.json(atendimento);
-});
+      await client.query(
+        `INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio)
+         VALUES ($1, $2, $3, '-', NOW())`,
+        [pessoa, cliente, tipo],
+      );
 
-// FINALIZAR ATENDIMENTO
-app.post("/atendimento/finalizar", async (req, res) => {
-  const { id } = req.body;
+      await client.query("COMMIT");
+      res.json(r.rows[0]);
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }),
+);
 
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+app.post(
+  "/atendimento/finalizar",
+  asyncRoute(async (req, res) => {
+    const id = idObrigatorio(req.body.id);
 
-    const r = await client.query(
-      "UPDATE atendimentos SET fim = NOW() WHERE id = $1 RETURNING *",
-      [id],
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    const att = r.rows[0];
+      const r = await client.query(
+        "UPDATE atendimentos SET fim = NOW() WHERE id = $1 AND fim IS NULL RETURNING *",
+        [id],
+      );
 
-    if (att) {
+      const atendimento = r.rows[0];
+
+      if (!atendimento) {
+        const erro = new Error("Atendimento não encontrado ou já finalizado.");
+        erro.status = 404;
+        throw erro;
+      }
+
       await client.query(
         `UPDATE historico_treinamento
          SET data_fim = NOW()
@@ -197,151 +327,116 @@ app.post("/atendimento/finalizar", async (req, res) => {
            ORDER BY id DESC
            LIMIT 1
          )`,
-        [att.pessoa, att.cliente],
+        [atendimento.pessoa, atendimento.cliente],
       );
-    }
 
-    await client.query("COMMIT");
-    res.send("ok");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    console.error("Erro finalizar atendimento:", err);
-    res.status(500).send(err.message);
-  } finally {
-    client.release();
-  }
-});
+      await client.query("COMMIT");
+      res.send("ok");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }),
+);
 
 // =============================
 // FILA MANUTENÇÃO
 // =============================
-app.get("/fila/manutencao", async (req, res) => {
-  const r = await pool.query("SELECT * FROM fila_manutencao ORDER BY posicao");
-  res.json(r.rows);
-});
+app.get(
+  "/fila/manutencao",
+  asyncRoute(async (_req, res) => {
+    const r = await listarFila("manutencao");
+    res.json(r.rows);
+  }),
+);
 
-// ROTACIONAR MANUTENÇÃO
-app.post("/fila/manutencao/rotacionar", async (req, res) => {
-  const r = await pool.query("SELECT * FROM fila_manutencao ORDER BY posicao");
-  if (!r.rows.length) return res.send("ok");
+app.post(
+  "/fila/manutencao/rotacionar",
+  asyncRoute(async (_req, res) => {
+    await rotacionarFila("manutencao");
+    res.send("ok");
+  }),
+);
 
-  const first = r.rows[0];
+app.post(
+  "/fila/manutencao/pular",
+  asyncRoute(async (req, res) => {
+    const motivo = textoOpcional(req.body.motivo, "Não especificado", 150);
+    await pularFila("manutencao", motivo);
+    res.send("ok");
+  }),
+);
 
-  await pool.query("UPDATE fila_manutencao SET posicao = posicao - 1");
-  await pool.query(
-    "UPDATE fila_manutencao SET posicao = (SELECT COALESCE(MAX(posicao),0)+1 FROM fila_manutencao) WHERE id=$1",
-    [first.id],
-  );
+app.post(
+  "/manutencao",
+  asyncRoute(async (req, res) => {
+    const pessoa = textoObrigatorio(req.body.pessoa, "a pessoa", 100);
+    const equipamento = textoObrigatorio(req.body.equipamento, "o equipamento", 80);
 
-  res.send("ok");
-});
+    await pool.query(
+      "INSERT INTO historico_manutencao (pessoa, equipamento) VALUES ($1, $2)",
+      [pessoa, equipamento],
+    );
 
-// PULAR MANUTENÇÃO
-app.post("/fila/manutencao/pular", async (req, res) => {
-  const { motivo = "Não especificado" } = req.body;
-
-  const r = await pool.query("SELECT * FROM fila_manutencao ORDER BY posicao");
-
-  if (r.rows.length < 2) {
-    return res.send("ok");
-  }
-
-  const first = r.rows[0];
-  const second = r.rows[1];
-
-  await pool.query("UPDATE fila_manutencao SET posicao = 2 WHERE id = $1", [
-    first.id,
-  ]);
-
-  await pool.query("UPDATE fila_manutencao SET posicao = 1 WHERE id = $1", [
-    second.id,
-  ]);
-
-  // registra no histórico
-  await pool.query(
-    `INSERT INTO historico_manutencao (
-      pessoa,
-      equipamento,
-      data_inicio
-    ) VALUES ($1, $2, NOW())`,
-    [first.nome, `PULADO - ${motivo}`],
-  );
-
-  res.send("ok");
-});
-
-// MANUTENÇÃO FINALIZADA
-app.post("/manutencao", async (req, res) => {
-  const { pessoa, equipamento } = req.body;
-
-  await pool.query(
-    "INSERT INTO historico_manutencao (pessoa, equipamento) VALUES ($1,$2)",
-    [pessoa, equipamento],
-  );
-
-  res.send("ok");
-});
+    res.send("ok");
+  }),
+);
 
 // =============================
 // HISTÓRICO COMPLETO
 // =============================
-app.get("/historico/completo", async (req, res) => {
-  try {
-    const { inicio, fim } = req.query;
+app.get(
+  "/historico/completo",
+  asyncRoute(async (req, res) => {
+    const periodo = validarPeriodo(req.query.inicio, req.query.fim);
+    const params = periodo || [];
+    const filtroTreinamento = periodo
+      ? "AND data_inicio::date BETWEEN $1::date AND $2::date"
+      : "";
+    const whereManutencao = periodo
+      ? "WHERE data::date BETWEEN $1::date AND $2::date"
+      : "";
 
-    let filtroData = "";
+    const treinamentos = await pool.query(
+      `SELECT pessoa, cliente, tipo, data_inicio, data_fim
+       FROM historico_treinamento
+       WHERE tipo <> 'Pulada'
+       ${filtroTreinamento}
+       ORDER BY id DESC
+       LIMIT 100`,
+      params,
+    );
 
-    if (inicio && fim) {
-      filtroData = `
-        AND DATE(data_inicio)
-        BETWEEN '${inicio}' AND '${fim}'
-      `;
-    }
+    const puladas = await pool.query(
+      `SELECT pessoa, motivo, data_inicio
+       FROM historico_treinamento
+       WHERE tipo = 'Pulada'
+       ${filtroTreinamento}
+       ORDER BY id DESC
+       LIMIT 100`,
+      params,
+    );
 
-    const treinamentos = await pool.query(`
-      SELECT
-        pessoa,
-        cliente,
-        tipo,
-        data_inicio,
-        data_fim
-      FROM historico_treinamento
-      WHERE tipo != 'Pulada'
-      ${filtroData}
-      ORDER BY id DESC
-      LIMIT 100
-    `);
+    const manutencao = await pool.query(
+      `SELECT pessoa, equipamento, data
+       FROM historico_manutencao
+       ${whereManutencao}
+       ORDER BY id DESC
+       LIMIT 100`,
+      params,
+    );
 
-    const puladas = await pool.query(`
-      SELECT
-        pessoa,
-        motivo,
-        data_inicio
-      FROM historico_treinamento
-      WHERE tipo = 'Pulada'
-      ${filtroData}
-      ORDER BY id DESC
-      LIMIT 100
-    `);
-
-    const manutencao = await pool.query(`
-      SELECT
-        pessoa,
-        equipamento,
-        data
-      FROM historico_manutencao
-      ORDER BY id DESC
-      LIMIT 100
-    `);
-
-    const ranking = await pool.query(`
-      SELECT pessoa, COUNT(*) as total
-      FROM historico_treinamento
-      WHERE tipo != 'Pulada'
-      ${filtroData}
-      GROUP BY pessoa
-      ORDER BY total DESC
-    `);
+    const ranking = await pool.query(
+      `SELECT pessoa, COUNT(*) as total
+       FROM historico_treinamento
+       WHERE tipo <> 'Pulada'
+       ${filtroTreinamento}
+       GROUP BY pessoa
+       ORDER BY total DESC, pessoa ASC`,
+      params,
+    );
 
     res.json({
       treinamentos: treinamentos.rows,
@@ -349,10 +444,12 @@ app.get("/historico/completo", async (req, res) => {
       manutencao: manutencao.rows,
       ranking: ranking.rows,
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ erro: err.message });
-  }
+  }),
+);
+
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  res.status(err.status || 500).json({ erro: err.message || "Erro interno" });
 });
 
 const PORT = process.env.PORT || 3000;
