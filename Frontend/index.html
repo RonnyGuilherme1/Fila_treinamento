@@ -156,7 +156,7 @@
               <label for="equipamento">Equipamento</label>
               <input id="equipamento" placeholder="Nº do equipamento" inputmode="numeric" maxlength="80" autocomplete="off" />
             </div>
-            <button id="btnIniciarManutencao" onclick="chamarManutencao()">Finalizar</button>
+            <button id="btnIniciarManutencao" onclick="chamarManutencao()">Registrar manutenção</button>
             <button class="warning" onclick="pularManutencao()">Pular</button>
             <button class="secondary" onclick="atualizar()">Atualizar</button>
           </div>
@@ -205,7 +205,7 @@
           maxlength="150"
         ></textarea>
         <div class="modal-actions">
-          <button class="btn-primary" onclick="confirmarPular()">Pular</button>
+          <button id="btnConfirmarPular" class="btn-primary" onclick="confirmarPular()">Pular</button>
           <button class="btn-secondary" onclick="fecharModalPular()">Cancelar</button>
         </div>
       </div>

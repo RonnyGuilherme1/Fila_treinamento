@@ -104,10 +104,23 @@ function limparCampo(id) {
   if (campo) campo.value = "";
 }
 
+function definirBotaoEnviando(id, enviando) {
+  const botao = document.getElementById(id);
+  if (!botao) return;
+
+  botao.disabled = enviando;
+  botao.setAttribute("aria-busy", enviando ? "true" : "false");
+  botao.style.opacity = enviando ? "0.65" : "";
+  botao.style.cursor = enviando ? "wait" : "";
+}
+
 // =============================
 // ESTADO GLOBAL
 // =============================
 let atendimentoSelecionado = null;
+let iniciandoTreinamento = false;
+let iniciandoManutencao = false;
+let confirmandoPulada = false;
 
 // =============================
 // ABA
@@ -156,36 +169,36 @@ function mostrarToast(mensagem, tipo = "success") {
 // TREINAMENTO
 // =============================
 async function chamarTreinamento() {
+  if (iniciandoTreinamento) return;
+
+  const cliente = document.getElementById("clienteTreinamento").value.trim();
+  const tipo = document.getElementById("tipoTreinamento").value;
+
+  if (!cliente) return mostrarToast("Informe o cliente.", "error");
+  if (cliente.length > 120)
+    return mostrarToast(
+      "Cliente deve ter no máximo 120 caracteres.",
+      "error",
+    );
+
+  iniciandoTreinamento = true;
+  definirBotaoEnviando("btnIniciarTreinamento", true);
+
   try {
-    const cliente = document.getElementById("clienteTreinamento").value.trim();
-    const tipo = document.getElementById("tipoTreinamento").value;
-
-    if (!cliente) return mostrarToast("Informe o cliente.", "error");
-    if (cliente.length > 120)
-      return mostrarToast(
-        "Cliente deve ter no máximo 120 caracteres.",
-        "error",
-      );
-
-    const fila = await requestJSON("/fila/treinamento");
-    if (!fila.length)
-      return mostrarToast("Fila de treinamento vazia.", "error");
-
-    const pessoa = fila[0].nome;
-
-    await requestJSON("/atendimento", {
+    await requestJSON("/treinamento/iniciar", {
       method: "POST",
-      body: JSON.stringify({ pessoa, cliente, tipo }),
+      body: JSON.stringify({ cliente, tipo }),
     });
-
-    await requestJSON("/fila/treinamento/rotacionar", { method: "POST" });
 
     limparCampo("clienteTreinamento");
     mostrarToast("Atendimento iniciado.");
-    atualizar();
+    await atualizar();
   } catch (err) {
     console.error(err);
     mostrarToast(err.message, "error");
+  } finally {
+    iniciandoTreinamento = false;
+    definirBotaoEnviando("btnIniciarTreinamento", false);
   }
 }
 
@@ -193,34 +206,35 @@ async function chamarTreinamento() {
 // MANUTENÇÃO
 // =============================
 async function chamarManutencao() {
+  if (iniciandoManutencao) return;
+
+  const equipamento = document.getElementById("equipamento").value.trim();
+
+  if (!equipamento) return mostrarToast("Informe o equipamento.", "error");
+  if (equipamento.length > 80)
+    return mostrarToast(
+      "Equipamento deve ter no máximo 80 caracteres.",
+      "error",
+    );
+
+  iniciandoManutencao = true;
+  definirBotaoEnviando("btnIniciarManutencao", true);
+
   try {
-    const equipamento = document.getElementById("equipamento").value.trim();
-
-    if (!equipamento) return mostrarToast("Informe o equipamento.", "error");
-    if (equipamento.length > 80)
-      return mostrarToast(
-        "Equipamento deve ter no máximo 80 caracteres.",
-        "error",
-      );
-
-    const fila = await requestJSON("/fila/manutencao");
-    if (!fila.length) return mostrarToast("Fila de manutenção vazia.", "error");
-
-    const pessoa = fila[0].nome;
-
-    await requestJSON("/manutencao", {
+    await requestJSON("/manutencao/iniciar", {
       method: "POST",
-      body: JSON.stringify({ pessoa, equipamento }),
+      body: JSON.stringify({ equipamento }),
     });
-
-    await requestJSON("/fila/manutencao/rotacionar", { method: "POST" });
 
     limparCampo("equipamento");
     mostrarToast("Manutenção registrada.");
-    atualizar();
+    await atualizar();
   } catch (err) {
     console.error(err);
     mostrarToast(err.message, "error");
+  } finally {
+    iniciandoManutencao = false;
+    definirBotaoEnviando("btnIniciarManutencao", false);
   }
 }
 
@@ -302,6 +316,8 @@ async function pularManutencao() {
 }
 
 async function confirmarPular() {
+  if (confirmandoPulada) return;
+
   const motivo = document.getElementById("inputMotivoPular").value.trim();
 
   if (!motivo) return mostrarToast("Informe o motivo.", "error");
@@ -314,6 +330,9 @@ async function confirmarPular() {
       ? "/fila/manutencao/pular"
       : "/fila/treinamento/pular";
 
+  confirmandoPulada = true;
+  definirBotaoEnviando("btnConfirmarPular", true);
+
   try {
     fecharModalPular();
 
@@ -323,10 +342,13 @@ async function confirmarPular() {
     });
 
     mostrarToast("Vez pulada com sucesso.");
-    atualizar();
+    await atualizar();
   } catch (err) {
     console.error(err);
     mostrarToast(err.message, "error");
+  } finally {
+    confirmandoPulada = false;
+    definirBotaoEnviando("btnConfirmarPular", false);
   }
 }
 
