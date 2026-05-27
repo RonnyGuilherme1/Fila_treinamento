@@ -49,6 +49,12 @@ function textoOpcional(valor, padrao, limite = 150) {
   return texto.slice(0, limite);
 }
 
+function erroHttp(mensagem, status = 400) {
+  const erro = new Error(mensagem);
+  erro.status = status;
+  return erro;
+}
+
 function idObrigatorio(valor) {
   const id = Number(valor);
 
@@ -79,6 +85,30 @@ async function listarFila(tipo, client = pool) {
   return client.query(`SELECT * FROM ${tabela} ORDER BY posicao NULLS LAST, id`);
 }
 
+async function listarFilaBloqueada(client, tabela) {
+  return client.query(
+    `SELECT * FROM (SELECT * FROM ${tabela} FOR UPDATE) fila ORDER BY posicao NULLS LAST, id`,
+  );
+}
+
+async function rotacionarLinhasFila(client, tabela, linhas) {
+  if (!linhas.length) return;
+
+  const [primeiro, ...restante] = linhas;
+
+  for (let i = 0; i < restante.length; i += 1) {
+    await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
+      i + 1,
+      restante[i].id,
+    ]);
+  }
+
+  await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
+    linhas.length,
+    primeiro.id,
+  ]);
+}
+
 async function rotacionarFila(tipo) {
   const tabela = FILAS[tipo];
   const client = await pool.connect();
@@ -86,30 +116,113 @@ async function rotacionarFila(tipo) {
   try {
     await client.query("BEGIN");
 
-    const r = await client.query(
-      `SELECT * FROM ${tabela} ORDER BY posicao NULLS LAST, id FOR UPDATE`,
-    );
+    const r = await listarFilaBloqueada(client, tabela);
 
     if (!r.rows.length) {
       await client.query("COMMIT");
       return;
     }
 
-    const [primeiro, ...restante] = r.rows;
-
-    for (let i = 0; i < restante.length; i += 1) {
-      await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
-        i + 1,
-        restante[i].id,
-      ]);
-    }
-
-    await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
-      r.rows.length,
-      primeiro.id,
-    ]);
+    await rotacionarLinhasFila(client, tabela, r.rows);
 
     await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+function traduzirErroAtendimentoDuplicado(err) {
+  if (err.code === "23505" && err.constraint === "idx_atendimentos_pessoa_aberto") {
+    return erroHttp("Ja existe atendimento em aberto para esta pessoa.", 409);
+  }
+
+  return err;
+}
+
+async function garantirSemAtendimentoAberto(client, pessoa) {
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [pessoa]);
+
+  const r = await client.query(
+    "SELECT id FROM atendimentos WHERE pessoa = $1 AND fim IS NULL FOR UPDATE",
+    [pessoa],
+  );
+
+  if (r.rows.length) {
+    throw erroHttp("Ja existe atendimento em aberto para esta pessoa.", 409);
+  }
+}
+
+async function criarAtendimentoTreinamento(client, pessoa, cliente, tipo) {
+  await garantirSemAtendimentoAberto(client, pessoa);
+
+  const atendimento = await client.query(
+    "INSERT INTO atendimentos (pessoa, cliente) VALUES ($1, $2) RETURNING *",
+    [pessoa, cliente],
+  );
+
+  await client.query(
+    `INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio)
+     VALUES ($1, $2, $3, '-', NOW())`,
+    [pessoa, cliente, tipo],
+  );
+
+  return atendimento.rows[0];
+}
+
+async function iniciarTreinamento(cliente, tipo) {
+  const tabela = FILAS.treinamento;
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const fila = await listarFilaBloqueada(client, tabela);
+
+    if (!fila.rows.length) {
+      throw erroHttp("Fila de treinamento vazia.", 409);
+    }
+
+    const pessoa = fila.rows[0].nome;
+    const atendimento = await criarAtendimentoTreinamento(client, pessoa, cliente, tipo);
+
+    await rotacionarLinhasFila(client, tabela, fila.rows);
+    await client.query("COMMIT");
+
+    return atendimento;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw traduzirErroAtendimentoDuplicado(err);
+  } finally {
+    client.release();
+  }
+}
+
+async function iniciarManutencao(equipamento) {
+  const tabela = FILAS.manutencao;
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const fila = await listarFilaBloqueada(client, tabela);
+
+    if (!fila.rows.length) {
+      throw erroHttp("Fila de manutencao vazia.", 409);
+    }
+
+    const pessoa = fila.rows[0].nome;
+    const manutencao = await client.query(
+      "INSERT INTO historico_manutencao (pessoa, equipamento) VALUES ($1, $2) RETURNING *",
+      [pessoa, equipamento],
+    );
+
+    await rotacionarLinhasFila(client, tabela, fila.rows);
+    await client.query("COMMIT");
+
+    return manutencao.rows[0];
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -125,9 +238,7 @@ async function pularFila(tipo, motivo) {
   try {
     await client.query("BEGIN");
 
-    const r = await client.query(
-      `SELECT * FROM ${tabela} ORDER BY posicao NULLS LAST, id FOR UPDATE`,
-    );
+    const r = await listarFilaBloqueada(client, tabela);
 
     if (r.rows.length < 2) {
       await client.query("COMMIT");
@@ -261,6 +372,17 @@ app.post(
 // ATENDIMENTO TREINAMENTO
 // =============================
 app.post(
+  "/treinamento/iniciar",
+  asyncRoute(async (req, res) => {
+    const cliente = textoObrigatorio(req.body.cliente, "o cliente", 120);
+    const tipo = textoOpcional(req.body.tipo, "Atendimento", 60);
+    const atendimento = await iniciarTreinamento(cliente, tipo);
+
+    res.json(atendimento);
+  }),
+);
+
+app.post(
   "/atendimento",
   asyncRoute(async (req, res) => {
     const pessoa = textoObrigatorio(req.body.pessoa, "a pessoa", 100);
@@ -272,22 +394,13 @@ app.post(
     try {
       await client.query("BEGIN");
 
-      const r = await client.query(
-        "INSERT INTO atendimentos (pessoa, cliente) VALUES ($1, $2) RETURNING *",
-        [pessoa, cliente],
-      );
-
-      await client.query(
-        `INSERT INTO historico_treinamento (pessoa, cliente, tipo, motivo, data_inicio)
-         VALUES ($1, $2, $3, '-', NOW())`,
-        [pessoa, cliente, tipo],
-      );
+      const atendimento = await criarAtendimentoTreinamento(client, pessoa, cliente, tipo);
 
       await client.query("COMMIT");
-      res.json(r.rows[0]);
+      res.json(atendimento);
     } catch (err) {
       await client.query("ROLLBACK");
-      throw err;
+      throw traduzirErroAtendimentoDuplicado(err);
     } finally {
       client.release();
     }
@@ -366,6 +479,16 @@ app.post(
     const motivo = textoOpcional(req.body.motivo, "Não especificado", 150);
     await pularFila("manutencao", motivo);
     res.send("ok");
+  }),
+);
+
+app.post(
+  "/manutencao/iniciar",
+  asyncRoute(async (req, res) => {
+    const equipamento = textoObrigatorio(req.body.equipamento, "o equipamento", 80);
+    const manutencao = await iniciarManutencao(equipamento);
+
+    res.json(manutencao);
   }),
 );
 

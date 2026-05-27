@@ -47,7 +47,10 @@ async function requestJSON(endpoint, options = {}) {
   });
 
   if (!res.ok) {
-    const mensagem = await lerMensagemErro(res, "Erro na comunicação com o servidor.");
+    const mensagem = await lerMensagemErro(
+      res,
+      "Erro na comunicação com o servidor.",
+    );
     throw new Error(mensagem);
   }
 
@@ -91,7 +94,8 @@ function formatarDuracao(inicio, fim) {
 function corPorTipo(tipo = "") {
   if (tipo.includes("2°") || tipo.includes("2º")) return TIPO_CORES.segundo;
   if (tipo.includes("3°") || tipo.includes("3º")) return TIPO_CORES.terceiro;
-  if (tipo.includes("Dúvida") || tipo.includes("Dúvidas")) return TIPO_CORES.duvidas;
+  if (tipo.includes("Dúvida") || tipo.includes("Dúvidas"))
+    return TIPO_CORES.duvidas;
   return TIPO_CORES.primeiro;
 }
 
@@ -117,7 +121,8 @@ function trocarAba(nome) {
   });
 
   const titulo = document.getElementById("titulo");
-  if (titulo) titulo.innerText = nome === "treinamento" ? "Treinamento" : "Manutenção";
+  if (titulo)
+    titulo.innerText = nome === "treinamento" ? "Treinamento" : "Manutenção";
 }
 
 // =============================
@@ -156,10 +161,15 @@ async function chamarTreinamento() {
     const tipo = document.getElementById("tipoTreinamento").value;
 
     if (!cliente) return mostrarToast("Informe o cliente.", "error");
-    if (cliente.length > 120) return mostrarToast("Cliente deve ter no máximo 120 caracteres.", "error");
+    if (cliente.length > 120)
+      return mostrarToast(
+        "Cliente deve ter no máximo 120 caracteres.",
+        "error",
+      );
 
     const fila = await requestJSON("/fila/treinamento");
-    if (!fila.length) return mostrarToast("Fila de treinamento vazia.", "error");
+    if (!fila.length)
+      return mostrarToast("Fila de treinamento vazia.", "error");
 
     const pessoa = fila[0].nome;
 
@@ -187,7 +197,11 @@ async function chamarManutencao() {
     const equipamento = document.getElementById("equipamento").value.trim();
 
     if (!equipamento) return mostrarToast("Informe o equipamento.", "error");
-    if (equipamento.length > 80) return mostrarToast("Equipamento deve ter no máximo 80 caracteres.", "error");
+    if (equipamento.length > 80)
+      return mostrarToast(
+        "Equipamento deve ter no máximo 80 caracteres.",
+        "error",
+      );
 
     const fila = await requestJSON("/fila/manutencao");
     if (!fila.length) return mostrarToast("Fila de manutenção vazia.", "error");
@@ -225,7 +239,8 @@ function abrirModal(el) {
   const atendimento = JSON.parse(decodeURIComponent(el.dataset.at));
   atendimentoSelecionado = atendimento;
 
-  document.getElementById("modalTexto").innerText = `${atendimento.pessoa} → ${atendimento.cliente}`;
+  document.getElementById("modalTexto").innerText =
+    `${atendimento.pessoa} → ${atendimento.cliente}`;
   document.getElementById("modalFinalizar").classList.remove("hidden");
 }
 
@@ -260,7 +275,8 @@ async function confirmarFinalizacao() {
 async function pularTreinamento() {
   try {
     const fila = await requestJSON("/fila/treinamento");
-    if (!fila.length) return mostrarToast("Fila de treinamento vazia.", "error");
+    if (!fila.length)
+      return mostrarToast("Fila de treinamento vazia.", "error");
 
     document.getElementById("inputMotivoPular").value = "";
     document.getElementById("modalPular").dataset.tipo = "treinamento";
@@ -289,10 +305,14 @@ async function confirmarPular() {
   const motivo = document.getElementById("inputMotivoPular").value.trim();
 
   if (!motivo) return mostrarToast("Informe o motivo.", "error");
-  if (motivo.length > 150) return mostrarToast("Motivo deve ter no máximo 150 caracteres.", "error");
+  if (motivo.length > 150)
+    return mostrarToast("Motivo deve ter no máximo 150 caracteres.", "error");
 
   const tipo = document.getElementById("modalPular").dataset.tipo;
-  const rota = tipo === "manutencao" ? "/fila/manutencao/pular" : "/fila/treinamento/pular";
+  const rota =
+    tipo === "manutencao"
+      ? "/fila/manutencao/pular"
+      : "/fila/treinamento/pular";
 
   try {
     fecharModalPular();
@@ -326,12 +346,18 @@ document.addEventListener("keydown", function (e) {
 // =============================
 function renderLista(lista) {
   return lista.length
-    ? lista.map((p, i) => `<li><strong>${i + 1}º</strong><span>${escapeHTML(p.nome)}</span></li>`).join("")
+    ? lista
+        .map(
+          (p, i) =>
+            `<li><strong>${i + 1}º</strong><span>${escapeHTML(p.nome)}</span></li>`,
+        )
+        .join("")
     : `<li class="empty-list">Nenhum item na fila</li>`;
 }
 
 function renderAtendimentos(atendimentos) {
-  if (!atendimentos.length) return '<p class="sem-atendimento">Nenhum atendimento em andamento.</p>';
+  if (!atendimentos.length)
+    return '<p class="sem-atendimento">Nenhum atendimento em andamento.</p>';
 
   return atendimentos
     .map((a) => {

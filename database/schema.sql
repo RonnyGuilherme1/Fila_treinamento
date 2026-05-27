@@ -31,6 +31,10 @@ CREATE TABLE IF NOT EXISTS atendimentos (
   fim TIMESTAMP
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_atendimentos_pessoa_aberto
+ON atendimentos (pessoa)
+WHERE fim IS NULL;
+
 -- =============================
 -- HISTÓRICO TREINAMENTO
 -- =============================
