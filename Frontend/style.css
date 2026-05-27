@@ -398,6 +398,10 @@ textarea {
   gap: 16px;
 }
 
+.config-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .full-width-box {
   width: 100%;
 }
@@ -433,6 +437,57 @@ textarea {
 
 .small-scroll {
   max-height: 230px;
+}
+
+.config-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.config-form input {
+  flex: 1;
+}
+
+.config-scroll {
+  max-height: 420px;
+}
+
+.config-table {
+  min-width: 620px;
+}
+
+.config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.config-action-btn {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.status-pill.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pill.inactive {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 table {
@@ -684,6 +739,10 @@ tbody tr:hover {
   .cards {
     grid-template-columns: 1fr;
   }
+
+  .config-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 620px) {
@@ -696,8 +755,13 @@ tbody tr:hover {
   }
 
   .acao button,
+  .config-form button,
   .field-group {
     width: 100%;
+  }
+
+  .config-form {
+    flex-direction: column;
   }
 
   .atendimento-header,

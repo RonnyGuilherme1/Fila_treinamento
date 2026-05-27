@@ -67,6 +67,25 @@ function idObrigatorio(valor) {
   return id;
 }
 
+function validarTipoFila(tipo) {
+  const tabela = FILAS[tipo];
+
+  if (!tabela) {
+    throw erroHttp("Tipo de fila invalido.", 400);
+  }
+
+  return tabela;
+}
+
+function booleanoOpcional(valor, campo) {
+  if (valor === undefined) return undefined;
+  if (typeof valor === "boolean") return valor;
+
+  const erro = new Error(`${campo} deve ser verdadeiro ou falso.`);
+  erro.status = 400;
+  throw erro;
+}
+
 function validarPeriodo(inicio, fim) {
   if (!inicio || !fim) return null;
 
@@ -80,14 +99,17 @@ function validarPeriodo(inicio, fim) {
   return [inicio, fim];
 }
 
-async function listarFila(tipo, client = pool) {
-  const tabela = FILAS[tipo];
-  return client.query(`SELECT * FROM ${tabela} ORDER BY posicao NULLS LAST, id`);
+async function listarFila(tipo, client = pool, somenteAtivos = true) {
+  const tabela = validarTipoFila(tipo);
+  const filtroAtivo = somenteAtivos ? "WHERE ativo IS DISTINCT FROM FALSE" : "";
+  return client.query(
+    `SELECT * FROM ${tabela} ${filtroAtivo} ORDER BY posicao NULLS LAST, id`,
+  );
 }
 
 async function listarFilaBloqueada(client, tabela) {
   return client.query(
-    `SELECT * FROM (SELECT * FROM ${tabela} FOR UPDATE) fila ORDER BY posicao NULLS LAST, id`,
+    `SELECT * FROM (SELECT * FROM ${tabela} WHERE ativo IS DISTINCT FROM FALSE FOR UPDATE) fila ORDER BY posicao NULLS LAST, id`,
   );
 }
 
@@ -95,22 +117,19 @@ async function rotacionarLinhasFila(client, tabela, linhas) {
   if (!linhas.length) return;
 
   const [primeiro, ...restante] = linhas;
+  const posicoes = linhas.map((linha, index) => linha.posicao || index + 1);
+  const rotacionada = [...restante, primeiro];
 
-  for (let i = 0; i < restante.length; i += 1) {
+  for (let i = 0; i < rotacionada.length; i += 1) {
     await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
-      i + 1,
-      restante[i].id,
+      posicoes[i],
+      rotacionada[i].id,
     ]);
   }
-
-  await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
-    linhas.length,
-    primeiro.id,
-  ]);
 }
 
 async function rotacionarFila(tipo) {
-  const tabela = FILAS[tipo];
+  const tabela = validarTipoFila(tipo);
   const client = await pool.connect();
 
   try {
@@ -173,7 +192,7 @@ async function criarAtendimentoTreinamento(client, pessoa, cliente, tipo) {
 }
 
 async function iniciarTreinamento(cliente, tipo) {
-  const tabela = FILAS.treinamento;
+  const tabela = validarTipoFila("treinamento");
   const client = await pool.connect();
 
   try {
@@ -201,7 +220,7 @@ async function iniciarTreinamento(cliente, tipo) {
 }
 
 async function iniciarManutencao(equipamento) {
-  const tabela = FILAS.manutencao;
+  const tabela = validarTipoFila("manutencao");
   const client = await pool.connect();
 
   try {
@@ -232,7 +251,7 @@ async function iniciarManutencao(equipamento) {
 }
 
 async function pularFila(tipo, motivo) {
-  const tabela = FILAS[tipo];
+  const tabela = validarTipoFila(tipo);
   const client = await pool.connect();
 
   try {
@@ -247,10 +266,15 @@ async function pularFila(tipo, motivo) {
 
     const [primeiro, segundo] = r.rows;
 
-    await client.query(`UPDATE ${tabela} SET posicao = 2 WHERE id = $1`, [
+    const primeiraPosicao = primeiro.posicao || 1;
+    const segundaPosicao = segundo.posicao || 2;
+
+    await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
+      segundaPosicao,
       primeiro.id,
     ]);
-    await client.query(`UPDATE ${tabela} SET posicao = 1 WHERE id = $1`, [
+    await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
+      primeiraPosicao,
       segundo.id,
     ]);
 
@@ -266,6 +290,142 @@ async function pularFila(tipo, motivo) {
          VALUES ($1, $2, NOW())`,
         [primeiro.nome, `PULADO - ${motivo}`],
       );
+    }
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function normalizarPosicoesFila(client, tabela) {
+  const r = await client.query(
+    `SELECT id FROM ${tabela} ORDER BY posicao NULLS LAST, id`,
+  );
+
+  for (let i = 0; i < r.rows.length; i += 1) {
+    await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
+      i + 1,
+      r.rows[i].id,
+    ]);
+  }
+}
+
+async function adicionarTecnicoFila(tipo, nome) {
+  const tabela = validarTipoFila(tipo);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(`LOCK TABLE ${tabela} IN EXCLUSIVE MODE`);
+    await normalizarPosicoesFila(client, tabela);
+
+    const posicao = await client.query(
+      `SELECT COALESCE(MAX(posicao), 0) + 1 AS proxima FROM ${tabela}`,
+    );
+    const r = await client.query(
+      `INSERT INTO ${tabela} (nome, posicao, ativo) VALUES ($1, $2, TRUE) RETURNING *`,
+      [nome, posicao.rows[0].proxima],
+    );
+
+    await client.query("COMMIT");
+    return r.rows[0];
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function atualizarTecnicoFila(tipo, id, dados) {
+  const tabela = validarTipoFila(tipo);
+  const nome =
+    Object.prototype.hasOwnProperty.call(dados, "nome")
+      ? textoObrigatorio(dados.nome, "o nome", 100)
+      : undefined;
+  const ativo = booleanoOpcional(dados.ativo, "ativo");
+
+  if (nome === undefined && ativo === undefined) {
+    throw erroHttp("Informe nome ou status para atualizar.", 400);
+  }
+
+  const campos = [];
+  const valores = [];
+
+  if (nome !== undefined) {
+    valores.push(nome);
+    campos.push(`nome = $${valores.length}`);
+  }
+
+  if (ativo !== undefined) {
+    valores.push(ativo);
+    campos.push(`ativo = $${valores.length}`);
+  }
+
+  valores.push(id);
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(`LOCK TABLE ${tabela} IN EXCLUSIVE MODE`);
+
+    const r = await client.query(
+      `UPDATE ${tabela} SET ${campos.join(", ")} WHERE id = $${valores.length} RETURNING *`,
+      valores,
+    );
+
+    if (!r.rows[0]) {
+      throw erroHttp("Tecnico nao encontrado.", 404);
+    }
+
+    await normalizarPosicoesFila(client, tabela);
+    await client.query("COMMIT");
+    return r.rows[0];
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function moverTecnicoFila(tipo, id, direcao) {
+  const tabela = validarTipoFila(tipo);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(`LOCK TABLE ${tabela} IN EXCLUSIVE MODE`);
+    await normalizarPosicoesFila(client, tabela);
+
+    const r = await client.query(
+      `SELECT * FROM ${tabela} ORDER BY posicao NULLS LAST, id`,
+    );
+    const index = r.rows.findIndex((linha) => linha.id === id);
+
+    if (index === -1) {
+      throw erroHttp("Tecnico nao encontrado.", 404);
+    }
+
+    const destino = direcao === "subir" ? index - 1 : index + 1;
+
+    if (destino >= 0 && destino < r.rows.length) {
+      const atual = r.rows[index];
+      const outro = r.rows[destino];
+
+      await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
+        outro.posicao,
+        atual.id,
+      ]);
+      await client.query(`UPDATE ${tabela} SET posicao = $1 WHERE id = $2`, [
+        atual.posicao,
+        outro.id,
+      ]);
     }
 
     await client.query("COMMIT");
@@ -337,6 +497,76 @@ app.get(
       historicoManut: historicoManutencao.rows,
       ranking: ranking.rows,
     });
+  }),
+);
+
+// =============================
+// CONFIGURAÇÃO DAS FILAS
+// =============================
+app.get(
+  "/config/filas",
+  asyncRoute(async (_req, res) => {
+    const [treinamento, manutencao] = await Promise.all([
+      listarFila("treinamento", pool, false),
+      listarFila("manutencao", pool, false),
+    ]);
+
+    res.json({
+      treinamento: treinamento.rows,
+      manutencao: manutencao.rows,
+    });
+  }),
+);
+
+app.post(
+  "/config/filas/:tipo",
+  asyncRoute(async (req, res) => {
+    const tipo = req.params.tipo;
+    validarTipoFila(tipo);
+
+    const nome = textoObrigatorio(req.body.nome, "o nome", 100);
+    const tecnico = await adicionarTecnicoFila(tipo, nome);
+
+    res.status(201).json(tecnico);
+  }),
+);
+
+app.patch(
+  "/config/filas/:tipo/:id",
+  asyncRoute(async (req, res) => {
+    const tipo = req.params.tipo;
+    validarTipoFila(tipo);
+
+    const id = idObrigatorio(req.params.id);
+    const tecnico = await atualizarTecnicoFila(tipo, id, req.body || {});
+
+    res.json(tecnico);
+  }),
+);
+
+app.post(
+  "/config/filas/:tipo/:id/subir",
+  asyncRoute(async (req, res) => {
+    const tipo = req.params.tipo;
+    validarTipoFila(tipo);
+
+    const id = idObrigatorio(req.params.id);
+    await moverTecnicoFila(tipo, id, "subir");
+
+    res.send("ok");
+  }),
+);
+
+app.post(
+  "/config/filas/:tipo/:id/descer",
+  asyncRoute(async (req, res) => {
+    const tipo = req.params.tipo;
+    validarTipoFila(tipo);
+
+    const id = idObrigatorio(req.params.id);
+    await moverTecnicoFila(tipo, id, "descer");
+
+    res.send("ok");
   }),
 );
 

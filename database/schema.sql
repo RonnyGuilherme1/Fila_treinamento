@@ -5,8 +5,16 @@
 CREATE TABLE IF NOT EXISTS fila_treinamento (
   id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
-  posicao INTEGER
+  posicao INTEGER,
+  ativo BOOLEAN DEFAULT TRUE
 );
+
+ALTER TABLE fila_treinamento
+ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;
+
+UPDATE fila_treinamento
+SET ativo = TRUE
+WHERE ativo IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_posicao_treinamento
 ON fila_treinamento (posicao);
@@ -14,8 +22,16 @@ ON fila_treinamento (posicao);
 CREATE TABLE IF NOT EXISTS fila_manutencao (
   id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
-  posicao INTEGER
+  posicao INTEGER,
+  ativo BOOLEAN DEFAULT TRUE
 );
+
+ALTER TABLE fila_manutencao
+ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;
+
+UPDATE fila_manutencao
+SET ativo = TRUE
+WHERE ativo IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_posicao_manutencao
 ON fila_manutencao (posicao);

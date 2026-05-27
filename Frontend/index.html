@@ -23,6 +23,9 @@
           <button class="nav-button" data-tab="manutencao" onclick="trocarAba('manutencao')">
             <span>Manutenção</span>
           </button>
+          <button class="nav-button" data-tab="configuracoes" onclick="trocarAba('configuracoes')">
+            <span>Configurações</span>
+          </button>
           <button class="nav-button" onclick="window.location.href = 'historico/historico.html'">
             <span>Histórico</span>
           </button>
@@ -180,6 +183,59 @@
                     </tr>
                   </thead>
                   <tbody id="historicoManutencao"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CONFIGURAÇÕES -->
+        <section id="configuracoes" class="aba">
+          <div class="grid config-grid">
+            <div class="box config-box">
+              <div class="box-header">
+                <h3>Fila de treinamento</h3>
+                <span>Técnicos da fila</span>
+              </div>
+              <div class="config-form">
+                <input id="novoTecnicoTreinamento" placeholder="Nome do técnico" maxlength="100" autocomplete="off" />
+                <button id="btnAdicionarTreinamento" onclick="adicionarTecnicoFila('treinamento')">Adicionar</button>
+              </div>
+              <div class="scroll config-scroll">
+                <table class="config-table">
+                  <thead>
+                    <tr>
+                      <th>Posição</th>
+                      <th>Nome</th>
+                      <th>Status</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="configFilaTreinamento"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="box config-box">
+              <div class="box-header">
+                <h3>Fila de manutenção</h3>
+                <span>Técnicos da fila</span>
+              </div>
+              <div class="config-form">
+                <input id="novoTecnicoManutencao" placeholder="Nome do técnico" maxlength="100" autocomplete="off" />
+                <button id="btnAdicionarManutencao" onclick="adicionarTecnicoFila('manutencao')">Adicionar</button>
+              </div>
+              <div class="scroll config-scroll">
+                <table class="config-table">
+                  <thead>
+                    <tr>
+                      <th>Posição</th>
+                      <th>Nome</th>
+                      <th>Status</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="configFilaManutencao"></tbody>
                 </table>
               </div>
             </div>

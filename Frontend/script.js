@@ -16,6 +16,19 @@ const TIPO_CORES = {
   duvidas: "#7c3aed",
 };
 
+const CONFIG_FILA_META = {
+  treinamento: {
+    inputId: "novoTecnicoTreinamento",
+    buttonId: "btnAdicionarTreinamento",
+    tbodyId: "configFilaTreinamento",
+  },
+  manutencao: {
+    inputId: "novoTecnicoManutencao",
+    buttonId: "btnAdicionarManutencao",
+    tbodyId: "configFilaManutencao",
+  },
+};
+
 // =============================
 // HELPERS
 // =============================
@@ -111,8 +124,11 @@ function limparCampo(id) {
   if (campo) campo.value = "";
 }
 
-function definirBotaoEnviando(id, enviando, textoEnviando) {
-  const botao = document.getElementById(id);
+function definirBotaoEnviando(referencia, enviando, textoEnviando) {
+  const botao =
+    typeof referencia === "string"
+      ? document.getElementById(referencia)
+      : referencia;
   if (!botao) return;
 
   if (!botao.dataset.textoOriginal) {
@@ -154,8 +170,14 @@ function trocarAba(nome) {
   });
 
   const titulo = document.getElementById("titulo");
-  if (titulo)
-    titulo.innerText = nome === "treinamento" ? "Treinamento" : "Manutenção";
+  const titulos = {
+    treinamento: "Treinamento",
+    manutencao: "Manutenção",
+    configuracoes: "Configurações",
+  };
+  if (titulo) titulo.innerText = titulos[nome] || "Treinamento";
+
+  if (nome === "configuracoes") carregarConfiguracoes();
 }
 
 // =============================
@@ -483,6 +505,122 @@ function renderRanking(ranking) {
     .join("");
 }
 
+function renderConfigFila(tipo, lista) {
+  if (!lista.length) {
+    return `<tr><td colspan="4" class="empty-cell">Nenhum técnico cadastrado nesta fila.</td></tr>`;
+  }
+
+  return lista
+    .map((tecnico, index) => {
+      const ativo = tecnico.ativo !== false;
+      const textoStatus = ativo ? "Ativo" : "Inativo";
+      const textoAlternar = ativo ? "Inativar" : "Ativar";
+      const proximoStatus = ativo ? "false" : "true";
+
+      return `
+        <tr>
+          <td>${escapeHTML(tecnico.posicao || "-")}</td>
+          <td>${escapeHTML(tecnico.nome || "-")}</td>
+          <td><span class="status-pill ${ativo ? "active" : "inactive"}">${textoStatus}</span></td>
+          <td>
+            <div class="config-actions">
+              <button class="config-action-btn secondary" ${index === 0 ? "disabled" : ""} onclick="moverTecnicoFila('${tipo}', ${tecnico.id}, 'subir', this)">Subir</button>
+              <button class="config-action-btn secondary" ${index === lista.length - 1 ? "disabled" : ""} onclick="moverTecnicoFila('${tipo}', ${tecnico.id}, 'descer', this)">Descer</button>
+              <button class="config-action-btn ${ativo ? "warning" : ""}" onclick="alternarTecnicoFila('${tipo}', ${tecnico.id}, ${proximoStatus}, this)">${textoAlternar}</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+async function carregarConfiguracoes() {
+  try {
+    const data = await requestJSON("/config/filas");
+
+    const treinamento = document.getElementById(CONFIG_FILA_META.treinamento.tbodyId);
+    if (treinamento) treinamento.innerHTML = renderConfigFila("treinamento", data.treinamento || []);
+
+    const manutencao = document.getElementById(CONFIG_FILA_META.manutencao.tbodyId);
+    if (manutencao) manutencao.innerHTML = renderConfigFila("manutencao", data.manutencao || []);
+  } catch (err) {
+    console.error(err);
+    mostrarToast(err.message, "error");
+  }
+}
+
+async function recarregarAposConfig() {
+  await carregarConfiguracoes();
+  await atualizar();
+}
+
+async function adicionarTecnicoFila(tipo) {
+  const meta = CONFIG_FILA_META[tipo];
+  if (!meta) return mostrarToast("Tipo de fila inválido.", "error");
+
+  const input = document.getElementById(meta.inputId);
+  const nome = input?.value.trim() || "";
+
+  if (!nome) return mostrarToast("Informe o nome do técnico.", "error");
+  if (nome.length > 100)
+    return mostrarToast("Nome deve ter no máximo 100 caracteres.", "error");
+
+  definirBotaoEnviando(meta.buttonId, true, "Adicionando...");
+
+  try {
+    await requestJSON(`/config/filas/${tipo}`, {
+      method: "POST",
+      body: JSON.stringify({ nome }),
+    });
+
+    limparCampo(meta.inputId);
+    mostrarToast("Técnico adicionado.");
+    await recarregarAposConfig();
+  } catch (err) {
+    console.error(err);
+    mostrarToast(err.message, "error");
+  } finally {
+    definirBotaoEnviando(meta.buttonId, false);
+  }
+}
+
+async function alternarTecnicoFila(tipo, id, ativo, botao) {
+  definirBotaoEnviando(botao, true, ativo ? "Ativando..." : "Inativando...");
+
+  try {
+    await requestJSON(`/config/filas/${tipo}/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ativo }),
+    });
+
+    mostrarToast(ativo ? "Técnico ativado." : "Técnico inativado.");
+    await recarregarAposConfig();
+  } catch (err) {
+    console.error(err);
+    mostrarToast(err.message, "error");
+  } finally {
+    definirBotaoEnviando(botao, false);
+  }
+}
+
+async function moverTecnicoFila(tipo, id, direcao, botao) {
+  definirBotaoEnviando(botao, true, direcao === "subir" ? "Subindo..." : "Descendo...");
+
+  try {
+    await requestJSON(`/config/filas/${tipo}/${id}/${direcao}`, {
+      method: "POST",
+    });
+
+    await recarregarAposConfig();
+  } catch (err) {
+    console.error(err);
+    mostrarToast(err.message, "error");
+  } finally {
+    definirBotaoEnviando(botao, false);
+  }
+}
+
 async function atualizar(botaoId) {
   if (botaoId) definirBotaoEnviando(botaoId, true, "Atualizando...");
 
@@ -546,5 +684,6 @@ function initQueueCard() {
 }
 
 atualizar();
+carregarConfiguracoes();
 initQueueCard();
 setInterval(atualizar, 60000);
