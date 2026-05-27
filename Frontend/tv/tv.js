@@ -48,10 +48,27 @@ function corPorTipo(tipo = "") {
   return "#16a34a";
 }
 
+function formatarHoraAtual(data = new Date()) {
+  return data.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function registrarAtualizacaoTV() {
+  const status = document.getElementById("tvUltimaAtualizacao");
+  if (status) status.textContent = `Atualizado às ${formatarHoraAtual()}`;
+}
+
 function renderFila(lista) {
   return lista.length
-    ? lista.map((p, i) => `<li><strong>${i + 1}º</strong><span>${escapeHTML(p.nome)}</span></li>`).join("")
-    : `<li class="tv-empty">Sem itens na fila</li>`;
+    ? lista
+        .map(
+          (p, i) =>
+            `<li><strong>${i + 1}º</strong><span>${escapeHTML(p.nome)}</span></li>`,
+        )
+        .join("")
+    : `<li class="tv-empty">Fila sem pessoas aguardando.</li>`;
 }
 
 async function atualizarTV() {
@@ -78,7 +95,7 @@ async function atualizarTV() {
               `;
             })
             .join("")
-        : '<p class="tv-sem-atendimento">Nenhum atendimento em andamento</p>';
+        : '<p class="tv-sem-atendimento">Nenhum treinamento em andamento no momento.</p>';
     }
 
     document.getElementById("tv-fila-treinamento").innerHTML = renderFila(fila);
@@ -95,12 +112,15 @@ async function atualizarTV() {
             `,
           )
           .join("")
-      : `<tr><td colspan="2">Sem ranking</td></tr>`;
+      : `<tr><td colspan="2" class="tv-empty-cell">Ranking será exibido após os primeiros atendimentos.</td></tr>`;
+
+    registrarAtualizacaoTV();
   } catch (err) {
     console.error(err);
-    document.getElementById("tv-atual").innerHTML = '<p class="tv-sem-atendimento">Falha ao carregar painel</p>';
+    document.getElementById("tv-atual").innerHTML =
+      '<p class="tv-sem-atendimento">Não foi possível atualizar o painel agora.</p>';
   }
 }
 
-setInterval(atualizarTV, 30000);
+setInterval(atualizarTV, 15000);
 atualizarTV();

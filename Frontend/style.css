@@ -50,6 +50,11 @@ button:hover {
   box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22);
 }
 
+button:disabled {
+  cursor: wait;
+  filter: saturate(0.85);
+}
+
 button:active {
   transform: translateY(1px) scale(0.99);
 }
@@ -141,11 +146,24 @@ textarea:focus-visible,
   letter-spacing: -0.04em;
 }
 
-.page-header p {
+.page-header-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.page-header-info p {
   max-width: 520px;
   margin: 0;
   color: var(--muted);
   text-align: right;
+}
+
+.last-updated {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 .eyebrow,
@@ -655,7 +673,11 @@ tbody tr:hover {
     flex-direction: column;
   }
 
-  .page-header p {
+  .page-header-info {
+    align-items: flex-start;
+  }
+
+  .page-header-info p {
     text-align: left;
   }
 

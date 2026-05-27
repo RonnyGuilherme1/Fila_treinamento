@@ -38,7 +38,10 @@
             <span class="eyebrow">Operação</span>
             <h1 id="titulo">Treinamento</h1>
           </div>
-          <p>Controle simples para chamada, atendimento e histórico da equipe.</p>
+          <div class="page-header-info">
+            <p>Controle simples para chamada, atendimento e histórico da equipe.</p>
+            <span id="ultimaAtualizacao" class="last-updated">Atualizado às --:--</span>
+          </div>
         </header>
 
         <!-- TREINAMENTO -->
@@ -86,7 +89,7 @@
             </div>
             <button id="btnIniciarTreinamento" onclick="chamarTreinamento()">Iniciar</button>
             <button class="warning" onclick="pularTreinamento()">Pular</button>
-            <button class="secondary" onclick="atualizar()">Atualizar</button>
+            <button id="btnAtualizarTreinamento" class="secondary" onclick="atualizar('btnAtualizarTreinamento')">Atualizar</button>
           </div>
 
           <div class="grid">
@@ -158,7 +161,7 @@
             </div>
             <button id="btnIniciarManutencao" onclick="chamarManutencao()">Registrar manutenção</button>
             <button class="warning" onclick="pularManutencao()">Pular</button>
-            <button class="secondary" onclick="atualizar()">Atualizar</button>
+            <button id="btnAtualizarManutencao" class="secondary" onclick="atualizar('btnAtualizarManutencao')">Atualizar</button>
           </div>
 
           <div class="grid">
@@ -190,7 +193,7 @@
         <h2>Finalizar atendimento</h2>
         <p id="modalTexto">-</p>
         <div class="modal-actions">
-          <button onclick="confirmarFinalizacao()">Finalizar</button>
+          <button id="btnConfirmarFinalizar" onclick="confirmarFinalizacao()">Finalizar</button>
           <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
         </div>
       </div>

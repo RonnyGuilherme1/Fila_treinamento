@@ -74,6 +74,13 @@ function formatarData(dataStr) {
   });
 }
 
+function formatarHoraAtual(data = new Date()) {
+  return data.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function formatarDuracao(inicio, fim) {
   if (!inicio || !fim) return "-";
 
@@ -104,14 +111,26 @@ function limparCampo(id) {
   if (campo) campo.value = "";
 }
 
-function definirBotaoEnviando(id, enviando) {
+function definirBotaoEnviando(id, enviando, textoEnviando) {
   const botao = document.getElementById(id);
   if (!botao) return;
 
+  if (!botao.dataset.textoOriginal) {
+    botao.dataset.textoOriginal = botao.textContent;
+  }
+
   botao.disabled = enviando;
   botao.setAttribute("aria-busy", enviando ? "true" : "false");
+  botao.textContent = enviando
+    ? textoEnviando || botao.dataset.textoOriginal
+    : botao.dataset.textoOriginal;
   botao.style.opacity = enviando ? "0.65" : "";
   botao.style.cursor = enviando ? "wait" : "";
+}
+
+function registrarAtualizacao() {
+  const status = document.getElementById("ultimaAtualizacao");
+  if (status) status.textContent = `Atualizado às ${formatarHoraAtual()}`;
 }
 
 // =============================
@@ -121,6 +140,7 @@ let atendimentoSelecionado = null;
 let iniciandoTreinamento = false;
 let iniciandoManutencao = false;
 let confirmandoPulada = false;
+let finalizandoAtendimento = false;
 
 // =============================
 // ABA
@@ -182,7 +202,7 @@ async function chamarTreinamento() {
     );
 
   iniciandoTreinamento = true;
-  definirBotaoEnviando("btnIniciarTreinamento", true);
+  definirBotaoEnviando("btnIniciarTreinamento", true, "Iniciando...");
 
   try {
     await requestJSON("/treinamento/iniciar", {
@@ -218,7 +238,7 @@ async function chamarManutencao() {
     );
 
   iniciandoManutencao = true;
-  definirBotaoEnviando("btnIniciarManutencao", true);
+  definirBotaoEnviando("btnIniciarManutencao", true, "Registrando...");
 
   try {
     await requestJSON("/manutencao/iniciar", {
@@ -264,22 +284,27 @@ function fecharModal() {
 }
 
 async function confirmarFinalizacao() {
-  if (!atendimentoSelecionado) return;
+  if (!atendimentoSelecionado || finalizandoAtendimento) return;
+
+  const id = atendimentoSelecionado.id;
+  finalizandoAtendimento = true;
+  definirBotaoEnviando("btnConfirmarFinalizar", true, "Finalizando...");
 
   try {
-    const id = atendimentoSelecionado.id;
-    fecharModal();
-
     await requestJSON("/atendimento/finalizar", {
       method: "POST",
       body: JSON.stringify({ id }),
     });
 
+    fecharModal();
     mostrarToast("Atendimento finalizado.");
-    atualizar();
+    await atualizar();
   } catch (err) {
     console.error(err);
     mostrarToast(err.message, "error");
+  } finally {
+    finalizandoAtendimento = false;
+    definirBotaoEnviando("btnConfirmarFinalizar", false);
   }
 }
 
@@ -331,16 +356,15 @@ async function confirmarPular() {
       : "/fila/treinamento/pular";
 
   confirmandoPulada = true;
-  definirBotaoEnviando("btnConfirmarPular", true);
+  definirBotaoEnviando("btnConfirmarPular", true, "Pulando...");
 
   try {
-    fecharModalPular();
-
     await requestJSON(rota, {
       method: "POST",
       body: JSON.stringify({ motivo }),
     });
 
+    fecharModalPular();
     mostrarToast("Vez pulada com sucesso.");
     await atualizar();
   } catch (err) {
@@ -374,12 +398,12 @@ function renderLista(lista) {
             `<li><strong>${i + 1}º</strong><span>${escapeHTML(p.nome)}</span></li>`,
         )
         .join("")
-    : `<li class="empty-list">Nenhum item na fila</li>`;
+    : `<li class="empty-list">Fila sem pessoas aguardando.</li>`;
 }
 
 function renderAtendimentos(atendimentos) {
   if (!atendimentos.length)
-    return '<p class="sem-atendimento">Nenhum atendimento em andamento.</p>';
+    return '<p class="sem-atendimento">Nenhum atendimento em andamento no momento.</p>';
 
   return atendimentos
     .map((a) => {
@@ -405,7 +429,7 @@ function renderAtendimentos(atendimentos) {
 
 function renderHistoricoTreinamento(historico) {
   if (!historico.length) {
-    return `<tr><td colspan="6" class="empty-cell">Nenhum histórico encontrado.</td></tr>`;
+    return `<tr><td colspan="6" class="empty-cell">Nenhum treinamento finalizado ainda.</td></tr>`;
   }
 
   return historico
@@ -426,7 +450,7 @@ function renderHistoricoTreinamento(historico) {
 
 function renderHistoricoManutencao(historico) {
   if (!historico.length) {
-    return `<tr><td colspan="3" class="empty-cell">Nenhum histórico encontrado.</td></tr>`;
+    return `<tr><td colspan="3" class="empty-cell">Nenhuma manutenção registrada ainda.</td></tr>`;
   }
 
   return historico
@@ -444,7 +468,7 @@ function renderHistoricoManutencao(historico) {
 
 function renderRanking(ranking) {
   if (!ranking.length) {
-    return `<tr><td colspan="2" class="empty-cell">Sem dados para ranking.</td></tr>`;
+    return `<tr><td colspan="2" class="empty-cell">Ranking será exibido após os primeiros atendimentos.</td></tr>`;
   }
 
   return ranking
@@ -459,7 +483,9 @@ function renderRanking(ranking) {
     .join("");
 }
 
-async function atualizar() {
+async function atualizar(botaoId) {
+  if (botaoId) definirBotaoEnviando(botaoId, true, "Atualizando...");
+
   try {
     const data = await requestJSON("/dashboard");
 
@@ -501,9 +527,13 @@ async function atualizar() {
 
     const rank = document.getElementById("ranking");
     if (rank) rank.innerHTML = renderRanking(ranking);
+
+    registrarAtualizacao();
   } catch (err) {
     console.error("Erro atualizar:", err);
     mostrarToast(err.message, "error");
+  } finally {
+    if (botaoId) definirBotaoEnviando(botaoId, false);
   }
 }
 
