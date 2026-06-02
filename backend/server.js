@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
 const path = require("path");
+const ExcelJS = require("exceljs");
 const pool = require("./db");
 
 const app = express();
@@ -21,6 +22,10 @@ const FILAS = {
   treinamento: "fila_treinamento",
   manutencao: "fila_manutencao",
 };
+
+const HISTORICO_LIMITE_TELA = 100;
+const HISTORICO_LIMITE_EXPORTACAO = 1000;
+const EXCEL_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -97,6 +102,288 @@ function validarPeriodo(inicio, fim) {
   }
 
   return [inicio, fim];
+}
+
+function limitarHistorico(limite) {
+  const numero = Number(limite);
+
+  if (!Number.isInteger(numero) || numero <= 0) return HISTORICO_LIMITE_TELA;
+  return Math.min(numero, HISTORICO_LIMITE_EXPORTACAO);
+}
+
+function dataParaExcel(valor) {
+  if (!valor) return null;
+
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return null;
+
+  return data;
+}
+
+function formatarDuracaoExportacao(inicio, fim) {
+  const dataInicio = dataParaExcel(inicio);
+  const dataFim = dataParaExcel(fim);
+
+  if (!dataInicio || !dataFim) return "-";
+
+  const diff = dataFim - dataInicio;
+  if (Number.isNaN(diff) || diff < 0) return "-";
+
+  const segundos = Math.floor(diff / 1000);
+  const minutos = Math.floor(segundos / 60);
+  const horas = Math.floor(minutos / 60);
+
+  if (horas > 0) return `${horas}h ${minutos % 60}m`;
+  return `${minutos}m ${segundos % 60}s`;
+}
+
+function colunaExcel(indice) {
+  let numero = indice;
+  let coluna = "";
+
+  while (numero > 0) {
+    const resto = (numero - 1) % 26;
+    coluna = String.fromCharCode(65 + resto) + coluna;
+    numero = Math.floor((numero - 1) / 26);
+  }
+
+  return coluna;
+}
+
+function textoPlanilha(valor) {
+  return String(valor || "-").trim() || "-";
+}
+
+async function buscarHistoricoCompleto({ inicio, fim, limite = HISTORICO_LIMITE_TELA, incluirRanking = true } = {}) {
+  const periodo = validarPeriodo(inicio, fim);
+  const paramsPeriodo = periodo || [];
+  const limiteSeguro = limitarHistorico(limite);
+  const paramsComLimite = [...paramsPeriodo, limiteSeguro];
+  const limiteSql = `$${paramsComLimite.length}`;
+  const filtroTreinamento = periodo
+    ? "AND data_inicio::date BETWEEN $1::date AND $2::date"
+    : "";
+  const whereManutencao = periodo
+    ? "WHERE data::date BETWEEN $1::date AND $2::date"
+    : "";
+
+  const consultas = [
+    pool.query(
+      `SELECT pessoa, cliente, tipo, data_inicio, data_fim
+       FROM historico_treinamento
+       WHERE tipo <> 'Pulada'
+       ${filtroTreinamento}
+       ORDER BY id DESC
+       LIMIT ${limiteSql}`,
+      paramsComLimite,
+    ),
+    pool.query(
+      `SELECT pessoa, motivo, data_inicio
+       FROM historico_treinamento
+       WHERE tipo = 'Pulada'
+       ${filtroTreinamento}
+       ORDER BY id DESC
+       LIMIT ${limiteSql}`,
+      paramsComLimite,
+    ),
+    pool.query(
+      `SELECT pessoa, equipamento, data
+       FROM historico_manutencao
+       ${whereManutencao}
+       ORDER BY id DESC
+       LIMIT ${limiteSql}`,
+      paramsComLimite,
+    ),
+  ];
+
+  if (incluirRanking) {
+    consultas.push(
+      pool.query(
+        `SELECT pessoa, COUNT(*) as total
+         FROM historico_treinamento
+         WHERE tipo <> 'Pulada'
+         ${filtroTreinamento}
+         GROUP BY pessoa
+         ORDER BY total DESC, pessoa ASC`,
+        paramsPeriodo,
+      ),
+    );
+  }
+
+  const [treinamentos, puladas, manutencao, ranking] = await Promise.all(consultas);
+
+  return {
+    treinamentos: treinamentos.rows,
+    puladas: puladas.rows,
+    manutencao: manutencao.rows,
+    ranking: ranking?.rows || [],
+  };
+}
+
+function estilizarTabelaExcel(worksheet, totalColunas) {
+  const ultimaColuna = colunaExcel(totalColunas);
+  worksheet.autoFilter = `A1:${ultimaColuna}1`;
+  worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+  const header = worksheet.getRow(1);
+  header.height = 24;
+  header.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF2563EB" },
+    };
+    cell.alignment = { vertical: "middle", horizontal: "center" };
+  });
+
+  for (let rowNumber = 1; rowNumber <= worksheet.rowCount; rowNumber += 1) {
+    const row = worksheet.getRow(rowNumber);
+    row.height = rowNumber === 1 ? 24 : 22;
+
+    for (let colNumber = 1; colNumber <= totalColunas; colNumber += 1) {
+      const cell = row.getCell(colNumber);
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFE2E8F0" } },
+        left: { style: "thin", color: { argb: "FFE2E8F0" } },
+        bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+        right: { style: "thin", color: { argb: "FFE2E8F0" } },
+      };
+      cell.alignment = { vertical: "middle", wrapText: true };
+    }
+  }
+}
+
+function adicionarAbaTabela(workbook, nome, colunas, linhas, colunasData = []) {
+  const worksheet = workbook.addWorksheet(nome);
+  worksheet.columns = colunas;
+
+  linhas.forEach((linha) => worksheet.addRow(linha));
+
+  colunasData.forEach((coluna) => {
+    worksheet.getColumn(coluna).numFmt = "dd/mm/yyyy hh:mm";
+  });
+
+  estilizarTabelaExcel(worksheet, colunas.length);
+  return worksheet;
+}
+
+function criarWorkbookHistorico(historico) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Fila Conecta";
+  workbook.created = new Date();
+  workbook.modified = new Date();
+
+  const resumo = workbook.addWorksheet("Resumo");
+  resumo.columns = [
+    { key: "campo", width: 30 },
+    { key: "valor", width: 24 },
+    { key: "extra1", width: 18 },
+    { key: "extra2", width: 18 },
+  ];
+
+  resumo.mergeCells("A1:D1");
+  resumo.getCell("A1").value = "Histórico de Atendimentos";
+  resumo.getCell("A1").font = { bold: true, size: 18, color: { argb: "FFFFFFFF" } };
+  resumo.getCell("A1").fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF16A34A" },
+  };
+  resumo.getCell("A1").alignment = { vertical: "middle", horizontal: "center" };
+  resumo.getRow(1).height = 30;
+
+  resumo.getCell("A3").value = "Data/hora da exportação";
+  resumo.getCell("B3").value = new Date();
+  resumo.getCell("B3").numFmt = "dd/mm/yyyy hh:mm";
+
+  const totais = [
+    ["Total de treinamentos", historico.treinamentos.length],
+    ["Total de puladas", historico.puladas.length],
+    ["Total de manutenções", historico.manutencao.length],
+    [
+      "Total geral",
+      historico.treinamentos.length + historico.puladas.length + historico.manutencao.length,
+    ],
+  ];
+
+  totais.forEach(([campo, valor], index) => {
+    const row = resumo.getRow(5 + index);
+    row.getCell(1).value = campo;
+    row.getCell(2).value = valor;
+  });
+
+  for (let rowNumber = 3; rowNumber <= 8; rowNumber += 1) {
+    const row = resumo.getRow(rowNumber);
+    row.height = 22;
+
+    for (let colNumber = 1; colNumber <= 2; colNumber += 1) {
+      const cell = row.getCell(colNumber);
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFE2E8F0" } },
+        left: { style: "thin", color: { argb: "FFE2E8F0" } },
+        bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+        right: { style: "thin", color: { argb: "FFE2E8F0" } },
+      };
+      cell.alignment = { vertical: "middle" };
+    }
+
+    row.getCell(1).font = { bold: true };
+  }
+
+  adicionarAbaTabela(
+    workbook,
+    "Treinamentos",
+    [
+      { header: "Técnico", key: "tecnico", width: 24 },
+      { header: "Cliente", key: "cliente", width: 28 },
+      { header: "Tipo", key: "tipo", width: 20 },
+      { header: "Data/Hora", key: "dataHora", width: 20 },
+      { header: "Duração", key: "duracao", width: 16 },
+    ],
+    historico.treinamentos.map((item) => ({
+      tecnico: textoPlanilha(item.pessoa),
+      cliente: textoPlanilha(item.cliente),
+      tipo: textoPlanilha(item.tipo),
+      dataHora: dataParaExcel(item.data_inicio),
+      duracao: formatarDuracaoExportacao(item.data_inicio, item.data_fim),
+    })),
+    ["dataHora"],
+  );
+
+  adicionarAbaTabela(
+    workbook,
+    "Puladas",
+    [
+      { header: "Técnico", key: "tecnico", width: 24 },
+      { header: "Motivo", key: "motivo", width: 40 },
+      { header: "Data/Hora", key: "dataHora", width: 20 },
+    ],
+    historico.puladas.map((item) => ({
+      tecnico: textoPlanilha(item.pessoa),
+      motivo: textoPlanilha(item.motivo),
+      dataHora: dataParaExcel(item.data_inicio),
+    })),
+    ["dataHora"],
+  );
+
+  adicionarAbaTabela(
+    workbook,
+    "Manutenção",
+    [
+      { header: "Técnico", key: "tecnico", width: 24 },
+      { header: "Equipamento", key: "equipamento", width: 34 },
+      { header: "Data/Hora", key: "dataHora", width: 20 },
+    ],
+    historico.manutencao.map((item) => ({
+      tecnico: textoPlanilha(item.pessoa),
+      equipamento: textoPlanilha(item.equipamento),
+      dataHora: dataParaExcel(item.data),
+    })),
+    ["dataHora"],
+  );
+
+  return workbook;
 }
 
 async function listarFila(tipo, client = pool, somenteAtivos = true) {
@@ -743,60 +1030,39 @@ app.post(
 app.get(
   "/historico/completo",
   asyncRoute(async (req, res) => {
-    const periodo = validarPeriodo(req.query.inicio, req.query.fim);
-    const params = periodo || [];
-    const filtroTreinamento = periodo
-      ? "AND data_inicio::date BETWEEN $1::date AND $2::date"
-      : "";
-    const whereManutencao = periodo
-      ? "WHERE data::date BETWEEN $1::date AND $2::date"
-      : "";
-
-    const treinamentos = await pool.query(
-      `SELECT pessoa, cliente, tipo, data_inicio, data_fim
-       FROM historico_treinamento
-       WHERE tipo <> 'Pulada'
-       ${filtroTreinamento}
-       ORDER BY id DESC
-       LIMIT 100`,
-      params,
-    );
-
-    const puladas = await pool.query(
-      `SELECT pessoa, motivo, data_inicio
-       FROM historico_treinamento
-       WHERE tipo = 'Pulada'
-       ${filtroTreinamento}
-       ORDER BY id DESC
-       LIMIT 100`,
-      params,
-    );
-
-    const manutencao = await pool.query(
-      `SELECT pessoa, equipamento, data
-       FROM historico_manutencao
-       ${whereManutencao}
-       ORDER BY id DESC
-       LIMIT 100`,
-      params,
-    );
-
-    const ranking = await pool.query(
-      `SELECT pessoa, COUNT(*) as total
-       FROM historico_treinamento
-       WHERE tipo <> 'Pulada'
-       ${filtroTreinamento}
-       GROUP BY pessoa
-       ORDER BY total DESC, pessoa ASC`,
-      params,
-    );
-
-    res.json({
-      treinamentos: treinamentos.rows,
-      puladas: puladas.rows,
-      manutencao: manutencao.rows,
-      ranking: ranking.rows,
+    const historico = await buscarHistoricoCompleto({
+      inicio: req.query.inicio,
+      fim: req.query.fim,
+      limite: HISTORICO_LIMITE_TELA,
     });
+
+    res.json(historico);
+  }),
+);
+
+app.get(
+  "/historico/excel",
+  asyncRoute(async (req, res) => {
+    try {
+      const historico = await buscarHistoricoCompleto({
+        inicio: req.query.inicio,
+        fim: req.query.fim,
+        limite: HISTORICO_LIMITE_EXPORTACAO,
+        incluirRanking: false,
+      });
+
+      const workbook = criarWorkbookHistorico(historico);
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      res.setHeader("Content-Type", EXCEL_MIME_TYPE);
+      res.setHeader("Content-Disposition", 'attachment; filename="historico-atendimentos.xlsx"');
+      res.send(Buffer.from(buffer));
+    } catch (err) {
+      console.error("Erro ao gerar Excel do histórico:", err.message);
+      res.status(err.status || 500).json({
+        erro: err.status ? err.message : "Erro ao gerar Excel do histórico.",
+      });
+    }
   }),
 );
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="../favicon.ico" />
+    <link rel="icon" href="/favicon.ico?v=2" type="image/x-icon" />
     <title>Histórico - Conecta</title>
     <link rel="stylesheet" href="historico.css" />
   </head>
@@ -58,6 +58,7 @@
           <button class="btn-treinamentos" onclick="baixarCSV('treinamentos')">CSV Treinamentos</button>
           <button class="btn-puladas" onclick="baixarCSV('puladas')">CSV Puladas</button>
           <button class="btn-manutencao" onclick="baixarCSV('manutencao')">CSV Manutenção</button>
+          <button class="btn-treinamentos" onclick="baixarExcel()">Baixar Excel</button>
         </div>
       </section>
 
@@ -70,10 +71,10 @@
           <table>
             <thead>
               <tr>
-                <th>Pessoa</th>
+                <th>Técnico</th>
                 <th>Cliente</th>
                 <th>Tipo</th>
-                <th>Data</th>
+                <th>Data/Hora</th>
                 <th>Duração</th>
               </tr>
             </thead>
@@ -93,9 +94,9 @@
           <table>
             <thead>
               <tr>
-                <th>Pessoa</th>
+                <th>Técnico</th>
                 <th>Motivo</th>
-                <th>Data</th>
+                <th>Data/Hora</th>
               </tr>
             </thead>
             <tbody id="tbPuladas">
@@ -114,9 +115,9 @@
           <table>
             <thead>
               <tr>
-                <th>Pessoa</th>
+                <th>Técnico</th>
                 <th>Equipamento</th>
-                <th>Data</th>
+                <th>Data/Hora</th>
               </tr>
             </thead>
             <tbody id="tbManutencao">

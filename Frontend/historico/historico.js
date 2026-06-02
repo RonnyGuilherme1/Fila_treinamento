@@ -41,6 +41,20 @@ async function requestJSON(endpoint) {
   return res.json();
 }
 
+function montarEndpointHistorico(endpoint) {
+  const inicio = document.getElementById("dataInicio")?.value || "";
+  const fim = document.getElementById("dataFim")?.value || "";
+  const params = new URLSearchParams();
+
+  if (inicio && fim) {
+    params.set("inicio", inicio);
+    params.set("fim", fim);
+  }
+
+  const query = params.toString();
+  return query ? `${endpoint}?${query}` : endpoint;
+}
+
 function formatarData(dataStr) {
   if (!dataStr) return "-";
 
@@ -132,14 +146,8 @@ function renderManutencao(lista) {
 }
 
 async function carregarHistorico() {
-  const inicio = document.getElementById("dataInicio")?.value || "";
-  const fim = document.getElementById("dataFim")?.value || "";
-
-  let url = "/historico/completo";
-  if (inicio && fim) url += `?inicio=${inicio}&fim=${fim}`;
-
   try {
-    const data = await requestJSON(url);
+    const data = await requestJSON(montarEndpointHistorico("/historico/completo"));
 
     const treinamentos = data.treinamentos || [];
     const puladas = data.puladas || [];
@@ -160,36 +168,65 @@ async function carregarHistorico() {
   }
 }
 
-function baixarCSV(tipo) {
-  const ids = {
-    treinamentos: "tbTreinamentos",
-    puladas: "tbPuladas",
-    manutencao: "tbManutencao",
-  };
+function baixarExcel() {
+  const endpoint = montarEndpointHistorico("/historico/excel");
+  const link = document.createElement("a");
 
-  const tabela = document.getElementById(ids[tipo]);
+  link.href = `${API}${endpoint}`;
+  link.download = "historico-atendimentos.xlsx";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function escaparCSV(valor) {
+  return `"${String(valor ?? "").replaceAll('"', '""')}"`;
+}
+
+function baixarCSV(tipo) {
+  const configuracoes = {
+    treinamentos: {
+      id: "tbTreinamentos",
+      cabecalhos: ["Técnico", "Cliente", "Tipo", "Data/Hora", "Duração"],
+    },
+    puladas: {
+      id: "tbPuladas",
+      cabecalhos: ["Técnico", "Motivo", "Data/Hora"],
+    },
+    manutencao: {
+      id: "tbManutencao",
+      cabecalhos: ["Técnico", "Equipamento", "Data/Hora"],
+    },
+  };
+  const config = configuracoes[tipo];
+
+  if (!config) return;
+
+  const tabela = document.getElementById(config.id);
   if (!tabela) return;
 
-  const linhas = [];
+  const linhas = [config.cabecalhos.map(escaparCSV).join(";")];
 
   tabela.querySelectorAll("tr").forEach((row) => {
     const cols = row.querySelectorAll("td");
-    if (!cols.length) return;
+    if (cols.length !== config.cabecalhos.length || row.querySelector(".empty-cell")) return;
 
     const linha = [...cols]
-      .map((c) => `"${c.innerText.replaceAll('"', '""')}"`)
+      .map((c) => escaparCSV(c.innerText))
       .join(";");
 
     linhas.push(linha);
   });
 
-  const blob = new Blob([linhas.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob([`\ufeff${linhas.join("\r\n")}`], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
 
   link.href = URL.createObjectURL(blob);
   link.download = `${tipo}.csv`;
+  document.body.appendChild(link);
   link.click();
   URL.revokeObjectURL(link.href);
+  link.remove();
 }
 
 carregarHistorico();
