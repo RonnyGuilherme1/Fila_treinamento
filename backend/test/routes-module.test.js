@@ -5,7 +5,7 @@ const {
   verifyPassword,
   normalizeUsername,
 } = require("../routes-module/auth");
-const { optimizeRoute } = require("../routes-module/routing");
+const { geocodeAddress, optimizeRoute } = require("../routes-module/routing");
 
 test("senha e armazenada com scrypt e validada sem texto puro", async () => {
   const password = "Senha-Forte-123";
@@ -38,6 +38,20 @@ test("fallback de rota ordena pontos e identifica que nao usa ruas", async () =>
     assert.equal(result.geometry.type, "LineString");
     assert.equal(result.geometry.coordinates.length, 4);
     assert.match(result.warning, /linha reta/);
+  } finally {
+    if (previousKey === undefined) delete process.env.ORS_API_KEY;
+    else process.env.ORS_API_KEY = previousKey;
+  }
+});
+
+test("busca de endereco sem ORS e tratada como configuracao ausente", async () => {
+  const previousKey = process.env.ORS_API_KEY;
+  delete process.env.ORS_API_KEY;
+  try {
+    await assert.rejects(
+      geocodeAddress("Rua de teste, Caruaru - PE"),
+      (error) => error.status === 409 && /nao configurada/.test(error.message),
+    );
   } finally {
     if (previousKey === undefined) delete process.env.ORS_API_KEY;
     else process.env.ORS_API_KEY = previousKey;

@@ -140,7 +140,7 @@ async function orsRoute(origin, stops, returnToOrigin, apiKey) {
 
 async function optimizeRoute({ origin, stops, returnToOrigin }) {
   if (!origin || !Number.isFinite(origin.latitude) || !Number.isFinite(origin.longitude)) {
-    throw httpError("Configure e confirme o ponto da empresa antes de otimizar.", 409);
+    throw httpError("Configure e confirme o ponto da base da empresa antes de otimizar.", 409);
   }
   if (!stops.length) throw httpError("Adicione ao menos uma parada antes de otimizar.", 409);
 
@@ -161,7 +161,7 @@ async function optimizeRoute({ origin, stops, returnToOrigin }) {
 async function geocodeAddress(address) {
   const apiKey = process.env.ORS_API_KEY;
   if (!apiKey) {
-    throw httpError("Busca automatica indisponivel. Marque o ponto diretamente no mapa ou configure ORS_API_KEY.", 503);
+    throw httpError("Busca automatica nao configurada. Marque o ponto diretamente no mapa ou configure ORS_API_KEY.", 409);
   }
   const url = new URL(`${ORS_BASE_URL}/geocode/search`);
   url.searchParams.set("api_key", apiKey);

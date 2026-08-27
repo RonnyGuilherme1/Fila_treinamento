@@ -20,7 +20,7 @@ app.use((req, res, next) => {
     res.setHeader("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com 'unsafe-inline'; img-src 'self' data: https://unpkg.com https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.basemaps.cartocdn.com https://tile.openstreetmap.de; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
     );
     if (process.env.NODE_ENV === "production") {
       res.setHeader("Strict-Transport-Security", "max-age=31536000");
@@ -28,6 +28,27 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+app.use(
+  "/vendor/leaflet",
+  express.static(path.join(__dirname, "node_modules/leaflet/dist"), {
+    maxAge: "30d",
+    etag: true,
+  }),
+);
+
+app.use(
+  "/rotas",
+  express.static(path.join(__dirname, "../Frontend/rotas"), {
+    maxAge: "1d",
+    etag: true,
+    setHeaders(res, filePath) {
+      if (path.extname(filePath) === ".html") {
+        res.setHeader("Cache-Control", "no-cache");
+      }
+    },
+  }),
+);
 
 app.use(
   express.static(path.join(__dirname, "../Frontend"), {

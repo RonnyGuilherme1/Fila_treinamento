@@ -6,6 +6,7 @@
     "cors": "^2.8.6",
     "exceljs": "^4.4.0",
     "express": "^4.22.1",
+    "leaflet": "^1.9.4",
     "pg": "^8.20.0"
   },
   "description": "",

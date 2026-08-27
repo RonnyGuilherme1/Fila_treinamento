@@ -1,5 +1,5 @@
 const API = "/api/rotas";
-const DEFAULT_CENTER = [-3.7319, -38.5267];
+const DEFAULT_CENTER = [-8.2835, -35.9761];
 
 const state = {
   user: null,
@@ -13,6 +13,7 @@ const state = {
   companyMarker: null,
   temporaryStopMarker: null,
   pinMode: null,
+  capabilities: { buscaAutomatica: false, calculoViario: false },
 };
 
 function element(id) { return document.getElementById(id); }
@@ -103,11 +104,34 @@ function statusLabel(status) {
 }
 
 function initMap(target, center = DEFAULT_CENTER) {
+  if (typeof L === "undefined") {
+    throw new Error("A biblioteca do mapa não foi carregada. Atualize a página.");
+  }
   const map = L.map(target, { zoomControl: true }).setView(center, 12);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  }).addTo(map);
+  let tileErrors = 0;
+  let usingFallback = false;
+  const primaryTiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    subdomains: "abcd",
+    maxZoom: 20,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  });
+  primaryTiles.on("tileerror", () => {
+    tileErrors += 1;
+    if (tileErrors < 4 || usingFallback) return;
+    usingFallback = true;
+    map.removeLayer(primaryTiles);
+    L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+    toast("A camada principal do mapa falhou; uma camada alternativa foi carregada.", "error");
+  });
+  primaryTiles.addTo(map);
+  if (typeof ResizeObserver !== "undefined") {
+    const observer = new ResizeObserver(() => map.invalidateSize({ pan: false }));
+    observer.observe(element(target));
+    map._conectaResizeObserver = observer;
+  }
   return map;
 }
 
@@ -137,7 +161,7 @@ function initializeCompanyMap() {
     setCompanyCoordinates(event.latlng.lat, event.latlng.lng);
     state.pinMode = null;
     show("companyPinHelp", false);
-    toast("Ponto da empresa confirmado.");
+    toast("Ponto da base confirmado.");
   });
 }
 
@@ -234,19 +258,40 @@ async function logout() {
 
 async function loadInitialData() {
   element("routeDate").value = element("routeDate").value || localDateValue();
-  await Promise.all([loadTechnicians(), loadCompanyConfig(), state.user.perfil === "supervisor" ? loadUsers() : Promise.resolve()]);
+  await Promise.all([
+    loadCapabilities(),
+    loadTechnicians(),
+    loadCompanyConfig(),
+    state.user.perfil === "supervisor" ? loadUsers() : Promise.resolve(),
+  ]);
   if (state.user.perfil === "tecnico") await loadPlans();
+}
+
+async function loadCapabilities() {
+  state.capabilities = await request("/capacidades");
+  const geocodingAvailable = state.capabilities.buscaAutomatica === true;
+  element("searchCompanyAddress").disabled = !geocodingAvailable;
+  element("searchStopAddress").disabled = !geocodingAvailable;
+  show("companyGeocodeHelp", !geocodingAvailable);
+  show("stopGeocodeHelp", !geocodingAvailable);
 }
 
 function switchPanel(name, button) {
   document.querySelectorAll(".panel").forEach((panel) => panel.classList.toggle("active", panel.id === `${name}Panel`));
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item === button));
-  const titles = { planejamento: "Planejamento", tecnicos: "Técnicos", usuarios: "Usuários", configuracao: "Empresa" };
+  const titles = { planejamento: "Planejamento", tecnicos: "Técnicos", usuarios: "Usuários", configuracao: "Base da empresa" };
   element("pageTitle").textContent = titles[name];
   if (name === "planejamento") setTimeout(() => state.routeMap?.invalidateSize(), 50);
   if (name === "configuracao") {
-    initializeCompanyMap();
-    setTimeout(() => { state.companyMap.invalidateSize(); centerCompanyMap(); }, 50);
+    setTimeout(() => {
+      try {
+        initializeCompanyMap();
+        state.companyMap.invalidateSize({ pan: false });
+        centerCompanyMap();
+      } catch (error) {
+        toast(error.message, "error");
+      }
+    }, 80);
   }
 }
 
@@ -352,29 +397,40 @@ async function loadCompanyConfig() {
 }
 
 function setCompanyCoordinates(latitude, longitude) {
+  if (!state.companyMap) initializeCompanyMap();
   element("companyLatitude").value = Number(latitude).toFixed(6);
   element("companyLongitude").value = Number(longitude).toFixed(6);
   if (state.companyMarker) state.companyMarker.remove();
-  state.companyMarker = L.marker([latitude, longitude]).addTo(state.companyMap).bindPopup("Empresa").openPopup();
+  state.companyMarker = L.marker([latitude, longitude]).addTo(state.companyMap).bindPopup("Base da empresa").openPopup();
   state.companyMap.setView([latitude, longitude], 16);
 }
 
 function centerCompanyMap() {
   const latitude = Number(element("companyLatitude").value);
   const longitude = Number(element("companyLongitude").value);
-  if (Number.isFinite(latitude) && Number.isFinite(longitude)) setCompanyCoordinates(latitude, longitude);
+  if (Number.isFinite(latitude) && Number.isFinite(longitude) && !(latitude === 0 && longitude === 0)) {
+    setCompanyCoordinates(latitude, longitude);
+  } else {
+    state.companyMap?.setView(DEFAULT_CENTER, 12);
+  }
 }
 
 async function saveCompany(event) {
   event.preventDefault();
   try {
+    const latitude = Number(element("companyLatitude").value);
+    const longitude = Number(element("companyLongitude").value);
+    if (latitude === 0 && longitude === 0) {
+      toast("Marque o ponto real da base no mapa antes de salvar.", "error");
+      return;
+    }
     await request("/configuracao", { method: "PATCH", body: JSON.stringify({
       empresaNome: element("companyName").value,
       empresaEndereco: element("companyAddress").value,
-      empresaLatitude: Number(element("companyLatitude").value),
-      empresaLongitude: Number(element("companyLongitude").value),
+      empresaLatitude: latitude,
+      empresaLongitude: longitude,
     }) });
-    toast("Configuração da empresa salva.");
+    toast("Base da empresa salva. Todas as rotas sairão e retornarão para este ponto.");
   } catch (error) { toast(error.message, "error"); }
 }
 
@@ -424,7 +480,7 @@ async function createPlan() {
   const date = element("routeDate").value;
   if (!technicianId || !date) return toast("Selecione o técnico e a data.", "error");
   try {
-    const plan = await request("/planos", { method: "POST", body: JSON.stringify({ tecnicoId: technicianId, data: date, retornarEmpresa: true }) });
+    const plan = await request("/planos", { method: "POST", body: JSON.stringify({ tecnicoId: technicianId, data: date }) });
     await openPlan(plan.id);
     toast("Rota do dia criada.");
   } catch (error) { toast(error.message, "error"); }
@@ -485,12 +541,13 @@ function renderStops() {
 }
 
 function renderRouteMap() {
+  if (!state.routeMap || !state.routeLayers) return;
   state.routeLayers.clearLayers();
   const plan = state.plan;
   const points = [];
   const origin = [plan.origem_latitude, plan.origem_longitude];
   if (origin.every(Number.isFinite)) {
-    L.marker(origin).bindPopup(`<strong>${escapeHTML(plan.origem_nome || "Empresa")}</strong><br>${escapeHTML(plan.origem_endereco || "")}`).addTo(state.routeLayers);
+    L.marker(origin).bindPopup(`<strong>Base: ${escapeHTML(plan.origem_nome || "Empresa")}</strong><br>${escapeHTML(plan.origem_endereco || "")}<br>Saída e retorno`).addTo(state.routeLayers);
     points.push(origin);
   }
   plan.paradas.forEach((stop, index) => {
@@ -502,7 +559,7 @@ function renderRouteMap() {
   if (plan.geometria) {
     L.geoJSON(plan.geometria, { style: { color: plan.provedor_rota === "estimativa-linear" ? "#64748b" : "#2563eb", weight: 5, opacity: 0.82, dashArray: plan.provedor_rota === "estimativa-linear" ? "8 7" : null } }).addTo(state.routeLayers);
   } else if (points.length > 1) {
-    L.polyline(points, { color: "#94a3b8", weight: 3, dashArray: "7 7" }).addTo(state.routeLayers);
+    L.polyline([...points, origin], { color: "#94a3b8", weight: 3, dashArray: "7 7" }).addTo(state.routeLayers);
   }
   if (points.length) state.routeMap.fitBounds(L.latLngBounds(points).pad(0.18), { maxZoom: 15 });
 }
@@ -516,11 +573,8 @@ function renderGoogleRouteLink() {
   const plan = state.plan;
   if (!plan.paradas.length) return show("openFullRoute", false);
   const origin = `${plan.origem_latitude},${plan.origem_longitude}`;
-  const last = plan.paradas[plan.paradas.length - 1];
-  const destination = plan.retornar_empresa ? origin : `${last.latitude},${last.longitude}`;
-  const waypointStops = plan.retornar_empresa ? plan.paradas : plan.paradas.slice(0, -1);
-  const params = new URLSearchParams({ api: "1", origin, destination, travelmode: "driving" });
-  if (waypointStops.length) params.set("waypoints", waypointStops.map((stop) => `${stop.latitude},${stop.longitude}`).join("|"));
+  const params = new URLSearchParams({ api: "1", origin, destination: origin, travelmode: "driving" });
+  params.set("waypoints", plan.paradas.map((stop) => `${stop.latitude},${stop.longitude}`).join("|"));
   element("openFullRoute").href = `https://www.google.com/maps/dir/?${params}`;
   show("openFullRoute", true);
 }
@@ -633,7 +687,7 @@ function bindEvents() {
   element("newUserRole").addEventListener("change", updateUserRoleForm);
   element("companyForm").addEventListener("submit", saveCompany);
   element("markStopMap").addEventListener("click", () => { state.pinMode = "stop"; show("pinHelp", true); show("mapHint", true); toast("Clique no mapa no local exato da parada."); });
-  element("markCompanyMap").addEventListener("click", () => { state.pinMode = "company"; show("companyPinHelp", true); toast("Clique no mapa no local da empresa."); });
+  element("markCompanyMap").addEventListener("click", () => { state.pinMode = "company"; show("companyPinHelp", true); toast("Clique no mapa no local da base da empresa."); });
   element("searchStopAddress").addEventListener("click", () => searchAddress(element("stopAddress").value, "stopSearchResults", (result) => {
     element("stopAddress").value = result.endereco; element("stopLatitude").value = result.latitude; element("stopLongitude").value = result.longitude;
     state.routeMap.setView([result.latitude, result.longitude], 16);

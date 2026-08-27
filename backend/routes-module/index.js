@@ -139,6 +139,13 @@ function createRoutesRouter(pool) {
     next();
   });
 
+  router.get("/capacidades", (_req, res) => {
+    res.json({
+      buscaAutomatica: Boolean(process.env.ORS_API_KEY),
+      calculoViario: Boolean(process.env.ORS_API_KEY),
+    });
+  });
+
   router.get("/tecnicos", asyncRoute(async (req, res) => {
     const params = [];
     let where = "";
@@ -258,6 +265,9 @@ function createRoutesRouter(pool) {
     const address = requiredText(req.body?.empresaEndereco, "o endereco da empresa", 300);
     const latitude = validCoordinate(req.body?.empresaLatitude, "latitude");
     const longitude = validCoordinate(req.body?.empresaLongitude, "longitude");
+    if (latitude === 0 && longitude === 0) {
+      throw httpError("Marque o ponto real da base da empresa no mapa antes de salvar.", 400);
+    }
     const result = await pool.query(
       `UPDATE rotas_configuracao
        SET empresa_nome = $1, empresa_endereco = $2, empresa_latitude = $3,
@@ -303,15 +313,15 @@ function createRoutesRouter(pool) {
     try {
       const technicianId = positiveId(req.body?.tecnicoId, "Tecnico");
       const date = validDate(req.body?.data);
-      const returnToCompany = optionalBoolean(req.body?.retornarEmpresa, "retornarEmpresa") ?? true;
       const [technician, config] = await Promise.all([
         pool.query("SELECT id FROM rotas_tecnicos WHERE id = $1 AND ativo = TRUE", [technicianId]),
         pool.query("SELECT * FROM rotas_configuracao WHERE id = 1"),
       ]);
       if (!technician.rows.length) throw httpError("Tecnico inexistente ou inativo.", 409);
       const settings = config.rows[0];
-      if (!settings.empresa_endereco || settings.empresa_latitude === null || settings.empresa_longitude === null) {
-        throw httpError("Configure o endereco e o ponto da empresa antes de criar rotas.", 409);
+      if (!settings.empresa_endereco || settings.empresa_latitude === null || settings.empresa_longitude === null
+        || (settings.empresa_latitude === 0 && settings.empresa_longitude === 0)) {
+        throw httpError("Configure o endereco e o ponto da base da empresa antes de criar rotas.", 409);
       }
       const result = await pool.query(
         `INSERT INTO rotas_planos
@@ -319,7 +329,7 @@ function createRoutesRouter(pool) {
           origem_latitude, origem_longitude, criado_por)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
-        [technicianId, date, returnToCompany, settings.empresa_nome, settings.empresa_endereco,
+        [technicianId, date, true, settings.empresa_nome, settings.empresa_endereco,
           settings.empresa_latitude, settings.empresa_longitude, req.routeUser.id],
       );
       res.status(201).json(result.rows[0]);
@@ -338,11 +348,10 @@ function createRoutesRouter(pool) {
     const status = req.body?.status ?? plan.status;
     if (!['rascunho', 'otimizada', 'publicada', 'concluida'].includes(status)) throw httpError("Status invalido.");
     if (status === "publicada" && !plan.geometria) throw httpError("Otimize a rota antes de publicar.", 409);
-    const returnToCompany = optionalBoolean(req.body?.retornarEmpresa, "retornarEmpresa") ?? plan.retornar_empresa;
     const result = await pool.query(
       `UPDATE rotas_planos SET status = $1, retornar_empresa = $2, atualizado_em = NOW()
        WHERE id = $3 RETURNING *`,
-      [status, returnToCompany, id],
+      [status, true, id],
     );
     res.json(result.rows[0]);
   }));
@@ -459,7 +468,7 @@ function createRoutesRouter(pool) {
     const result = await optimizeRoute({
       origin: { latitude: plan.origem_latitude, longitude: plan.origem_longitude },
       stops: stopsResult.rows,
-      returnToOrigin: plan.retornar_empresa,
+      returnToOrigin: true,
     });
     const client = await pool.connect();
     try {

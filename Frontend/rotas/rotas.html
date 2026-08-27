@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com 'unsafe-inline'; img-src 'self' data: https://unpkg.com https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.basemaps.cartocdn.com https://tile.openstreetmap.de; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <title>Conecta - Rotas externas</title>
     <link rel="icon" href="../favicon.ico" type="image/x-icon" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3ynHTeA+MZXYxAlIlMZQ8Z3h5J3mM=" crossorigin />
-    <link rel="stylesheet" href="rotas.css?v=1.0.1" />
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css?v=1.9.4" />
+    <link rel="stylesheet" href="rotas.css?v=1.0.3" />
   </head>
   <body>
     <div id="loginView" class="auth-shell">
@@ -51,7 +51,7 @@
           <button type="button" class="nav-item active" data-panel="planejamento">Planejamento</button>
           <button type="button" class="nav-item supervisor-only" data-panel="tecnicos">Técnicos</button>
           <button type="button" class="nav-item supervisor-only" data-panel="usuarios">Usuários</button>
-          <button type="button" class="nav-item supervisor-only" data-panel="configuracao">Empresa</button>
+          <button type="button" class="nav-item supervisor-only" data-panel="configuracao">Base da empresa</button>
         </nav>
         <a class="system-link" href="../index.html">← Sistema principal</a>
       </aside>
@@ -73,6 +73,7 @@
             <button id="loadRoutesButton" type="button" class="secondary-button">Consultar</button>
             <button id="createRouteButton" type="button" class="supervisor-only">Criar rota do dia</button>
           </div>
+          <p class="route-rule">Toda rota começa na base da empresa e retorna para a mesma base após a última parada.</p>
 
           <div id="emptyRoute" class="empty-state">
             <h2>Selecione a data da rota</h2>
@@ -108,6 +109,7 @@
                   <button id="searchStopAddress" type="button" class="secondary-button">Buscar endereço</button>
                   <button id="markStopMap" type="button" class="secondary-button">Marcar no mapa</button>
                 </div>
+                <p id="stopGeocodeHelp" class="helper-text hidden">Busca automática não configurada. Use “Marcar no mapa” ou configure ORS_API_KEY.</p>
                 <div id="stopSearchResults" class="search-results hidden"></div>
                 <div class="two-columns">
                   <label>Latitude<input id="stopLatitude" type="number" step="any" required /></label>
@@ -153,16 +155,17 @@
         </section>
 
         <section id="configuracaoPanel" class="panel">
-          <div class="section-header"><div><p class="eyebrow">Ponto de partida</p><h2>Empresa</h2></div></div>
+          <div class="section-header"><div><p class="eyebrow">Saída e retorno fixos</p><h2>Base da empresa</h2><p class="section-copy">Cadastre o ponto da nossa empresa uma única vez. Ele será usado como início e fim de todas as rotas.</p></div></div>
           <div class="config-layout">
             <form id="companyForm" class="company-form">
-              <label>Nome da empresa<input id="companyName" type="text" required maxlength="120" /></label>
-              <label>Endereço completo<textarea id="companyAddress" required maxlength="300"></textarea></label>
+              <label>Nome da base<input id="companyName" type="text" required maxlength="120" /></label>
+              <label>Endereço completo da base<textarea id="companyAddress" required maxlength="300"></textarea></label>
               <div class="inline-actions"><button id="searchCompanyAddress" type="button" class="secondary-button">Buscar endereço</button><button id="markCompanyMap" type="button" class="secondary-button">Marcar no mapa</button></div>
+              <p id="companyGeocodeHelp" class="helper-text hidden">Busca automática não configurada. Use “Marcar no mapa” ou configure ORS_API_KEY.</p>
               <div id="companySearchResults" class="search-results hidden"></div>
               <div class="two-columns"><label>Latitude<input id="companyLatitude" type="number" step="any" required /></label><label>Longitude<input id="companyLongitude" type="number" step="any" required /></label></div>
-              <p id="companyPinHelp" class="pin-help hidden">Clique no mapa para confirmar a localização da empresa.</p>
-              <button type="submit">Salvar configuração</button>
+              <p id="companyPinHelp" class="pin-help hidden">Clique no mapa para confirmar a localização da base.</p>
+              <button type="submit">Salvar base da empresa</button>
             </form>
             <div id="companyMap"></div>
           </div>
@@ -171,7 +174,7 @@
     </div>
 
     <div id="toastRegion" class="toast-region" aria-live="polite"></div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin></script>
-    <script src="rotas.js?v=1.0.1"></script>
+    <script src="/vendor/leaflet/leaflet.js?v=1.9.4"></script>
+    <script src="rotas.js?v=1.0.3"></script>
   </body>
 </html>

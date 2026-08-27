@@ -88,6 +88,10 @@ CREATE TABLE IF NOT EXISTS rotas_planos (
 CREATE INDEX IF NOT EXISTS idx_rotas_planos_data
 ON rotas_planos (data, tecnico_id);
 
+UPDATE rotas_planos
+SET retornar_empresa = TRUE
+WHERE retornar_empresa IS DISTINCT FROM TRUE;
+
 CREATE TABLE IF NOT EXISTS rotas_paradas (
   id SERIAL PRIMARY KEY,
   plano_id INTEGER NOT NULL REFERENCES rotas_planos(id) ON DELETE CASCADE,

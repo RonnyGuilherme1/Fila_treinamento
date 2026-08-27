@@ -74,6 +74,9 @@ textarea { min-height: 72px; resize: vertical; }
 .inline-form h3 { margin: 0; }.inline-form .inline-actions button { flex: 1; }
 .two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .pin-help { margin: 0; color: var(--blue); font-weight: 700; font-size: 0.84rem; }
+.helper-text { margin: 0; color: var(--warning); font-size: 0.78rem; font-weight: 700; line-height: 1.4; }
+.route-rule { padding: 10px 13px; margin: -4px 0 14px; color: #14532d; background: #ecfdf3; border: 1px solid #bbf7d0; border-radius: 9px; font-size: 0.84rem; font-weight: 750; }
+.section-copy { max-width: 680px; margin: 5px 0 0; color: var(--muted); font-size: 0.88rem; }
 .search-results { display: grid; gap: 5px; max-height: 170px; overflow-y: auto; }
 .search-result { text-align: left; color: var(--ink); background: #fff; border: 1px solid var(--line); font-weight: 500; }
 
