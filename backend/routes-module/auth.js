@@ -164,7 +164,7 @@ function createAuth(pool) {
 
       const result = await pool.query(
         `SELECT u.id, u.usuario, u.nome, u.perfil, u.tecnico_id, u.trocar_senha,
-                t.nome AS tecnico_nome, s.csrf_token, s.token_hash
+                t.nome AS tecnico_nome, s.csrf_token, s.token_hash, s.ultimo_uso_em
          FROM rotas_sessoes s
          JOIN rotas_usuarios u ON u.id = s.usuario_id
          LEFT JOIN rotas_tecnicos t ON t.id = u.tecnico_id
@@ -177,7 +177,13 @@ function createAuth(pool) {
 
       if (!result.rows.length) throw httpError("Sessao expirada. Faca login novamente.", 401);
       req.routeUser = result.rows[0];
-      await pool.query("UPDATE rotas_sessoes SET ultimo_uso_em = NOW() WHERE token_hash = $1", [result.rows[0].token_hash]);
+      const lastUse = new Date(result.rows[0].ultimo_uso_em).getTime();
+      if (!Number.isFinite(lastUse) || Date.now() - lastUse >= 5 * 60 * 1000) {
+        pool.query(
+          "UPDATE rotas_sessoes SET ultimo_uso_em = NOW() WHERE token_hash = $1 AND ultimo_uso_em < NOW() - INTERVAL '5 minutes'",
+          [result.rows[0].token_hash],
+        ).catch((error) => console.error("Falha ao atualizar uso da sessao:", error.message));
+      }
       next();
     } catch (error) {
       next(error);

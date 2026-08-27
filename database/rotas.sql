@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS rotas_planos (
   id SERIAL PRIMARY KEY,
   tecnico_id INTEGER NOT NULL REFERENCES rotas_tecnicos(id),
   data DATE NOT NULL,
+  titulo TEXT NOT NULL DEFAULT 'Rota',
   status TEXT NOT NULL DEFAULT 'rascunho'
     CHECK (status IN ('rascunho', 'otimizada', 'publicada', 'concluida')),
   retornar_empresa BOOLEAN NOT NULL DEFAULT TRUE,
@@ -81,9 +82,22 @@ CREATE TABLE IF NOT EXISTS rotas_planos (
   calculada_em TIMESTAMPTZ,
   criado_por INTEGER REFERENCES rotas_usuarios(id) ON DELETE SET NULL,
   criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (tecnico_id, data)
+  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE rotas_planos
+ADD COLUMN IF NOT EXISTS titulo TEXT;
+
+UPDATE rotas_planos
+SET titulo = 'Rota #' || id
+WHERE titulo IS NULL OR BTRIM(titulo) = '';
+
+ALTER TABLE rotas_planos
+ALTER COLUMN titulo SET DEFAULT 'Rota',
+ALTER COLUMN titulo SET NOT NULL;
+
+ALTER TABLE rotas_planos
+DROP CONSTRAINT IF EXISTS rotas_planos_tecnico_id_data_key;
 
 CREATE INDEX IF NOT EXISTS idx_rotas_planos_data
 ON rotas_planos (data, tecnico_id);

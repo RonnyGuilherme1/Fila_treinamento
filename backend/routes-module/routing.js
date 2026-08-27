@@ -14,6 +14,7 @@ const ORS_ENDPOINTS = ORS_CUSTOM_BASE_URL
     directions: "https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson",
     geocode: "https://api.heigit.org/pelias/v1/search",
   };
+const DEFAULT_SEARCH_REFERENCE = { latitude: -8.2835, longitude: -35.9761 };
 
 function haversineMeters(a, b) {
   const radius = 6371000;
@@ -25,6 +26,76 @@ function haversineMeters(a, b) {
   const value = Math.sin(deltaLat / 2) ** 2
     + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
   return 2 * radius * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function contextualizeAddress(address, reference) {
+  const normalized = normalizeSearchText(address);
+  const hasStateAbbreviation = /(?:^|[\s,-])(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)(?:$|[\s,-])/i.test(address);
+  const hasLocation = /\b(brasil|pernambuco|caruaru)\b/.test(normalized)
+    || hasStateAbbreviation;
+  if (hasLocation) return address;
+  return `${address}, Pernambuco, Brasil`;
+}
+
+function rankGeocodingFeatures(features, address, reference) {
+  const normalizedAddress = normalizeSearchText(address);
+  const tokens = normalizedAddress.split(" ").filter((token) => token.length >= 3);
+  const ranked = (features || []).map((feature) => {
+    const properties = feature.properties || {};
+    const coordinates = feature.geometry?.coordinates || [];
+    const latitude = Number(coordinates[1]);
+    const longitude = Number(coordinates[0]);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    const label = properties.label || address;
+    const searchable = normalizeSearchText([
+      label,
+      properties.name,
+      properties.street,
+      properties.locality,
+      properties.localadmin,
+      properties.county,
+      properties.region,
+      properties.region_a,
+      properties.postalcode,
+    ].filter(Boolean).join(" "));
+    const region = normalizeSearchText(`${properties.region || ""} ${properties.region_a || ""}`);
+    const locality = normalizeSearchText(`${properties.locality || ""} ${properties.localadmin || ""} ${properties.county || ""}`);
+    const distanceKm = haversineMeters(reference, { latitude, longitude }) / 1000;
+    let score = Number(properties.confidence || 0) * 100;
+    score += tokens.reduce((total, token) => total + (searchable.includes(token) ? 35 : 0), 0);
+    if (region.includes("pernambuco") || /(^| )pe( |$)/.test(region)) score += 450;
+    const candidateCities = [properties.locality, properties.localadmin, properties.county]
+      .map(normalizeSearchText).filter((value) => value.length >= 3);
+    if (candidateCities.some((city) => normalizedAddress.includes(city))) score += 650;
+    if (properties.layer === "address") score += 50;
+    score -= Math.min(distanceKm * 1.5, 500);
+    return {
+      endereco: label,
+      latitude,
+      longitude,
+      cidade: properties.locality || properties.localadmin || properties.county || null,
+      estado: properties.region_a || properties.region || null,
+      cep: properties.postalcode || null,
+      score,
+    };
+  }).filter(Boolean).sort((left, right) => right.score - left.score);
+
+  const seen = new Set();
+  return ranked.filter((item) => {
+    const key = `${item.endereco}|${item.latitude.toFixed(5)}|${item.longitude.toFixed(5)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 8).map(({ score: _score, ...item }) => item);
 }
 
 async function fetchJson(url, options = {}, timeoutMs = 15000) {
@@ -171,22 +242,25 @@ async function optimizeRoute({ origin, stops, returnToOrigin }) {
   }
 }
 
-async function geocodeAddress(address) {
+async function geocodeAddress(address, reference = {}) {
   const apiKey = process.env.ORS_API_KEY;
   if (!apiKey) {
     throw httpError("Busca automatica nao configurada. Marque o ponto diretamente no mapa ou configure ORS_API_KEY.", 409);
   }
+  const focus = {
+    latitude: Number.isFinite(reference.latitude) ? reference.latitude : DEFAULT_SEARCH_REFERENCE.latitude,
+    longitude: Number.isFinite(reference.longitude) ? reference.longitude : DEFAULT_SEARCH_REFERENCE.longitude,
+  };
   const url = new URL(ORS_ENDPOINTS.geocode);
   url.searchParams.set("api_key", apiKey);
-  url.searchParams.set("text", address);
+  url.searchParams.set("text", contextualizeAddress(address, focus));
   url.searchParams.set("boundary.country", "BR");
-  url.searchParams.set("size", "5");
+  url.searchParams.set("focus.point.lat", String(focus.latitude));
+  url.searchParams.set("focus.point.lon", String(focus.longitude));
+  url.searchParams.set("lang", "pt");
+  url.searchParams.set("size", "15");
   const body = await fetchJson(url.toString(), {}, 15000);
-  return (body.features || []).map((feature) => ({
-    endereco: feature.properties?.label || address,
-    latitude: feature.geometry?.coordinates?.[1],
-    longitude: feature.geometry?.coordinates?.[0],
-  })).filter((item) => Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
+  return rankGeocodingFeatures(body.features, address, focus);
 }
 
-module.exports = { optimizeRoute, geocodeAddress };
+module.exports = { optimizeRoute, geocodeAddress, contextualizeAddress, rankGeocodingFeatures };

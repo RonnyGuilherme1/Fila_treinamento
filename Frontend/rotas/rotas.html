@@ -9,9 +9,10 @@
     <title>Conecta - Rotas externas</title>
     <link rel="icon" href="../favicon.ico" type="image/x-icon" />
     <link rel="stylesheet" href="/vendor/leaflet/leaflet.css?v=1.9.4" />
-    <link rel="stylesheet" href="rotas.css?v=1.0.4" />
+    <link rel="stylesheet" href="rotas.css?v=1.1.0" />
   </head>
   <body>
+    <div id="globalLoading" class="global-loading hidden" aria-label="Carregando"><span></span></div>
     <div id="loginView" class="auth-shell">
       <section class="auth-card">
         <a class="back-link" href="../index.html">← Voltar ao sistema</a>
@@ -68,9 +69,11 @@
 
         <section id="planejamentoPanel" class="panel active">
           <div class="toolbar">
-            <label>Data<input id="routeDate" type="date" /></label>
             <label class="supervisor-only">Técnico<select id="routeTechnician"><option value="">Selecione</option></select></label>
+            <label>Data<input id="routeDate" type="date" /></label>
+            <label class="supervisor-only route-name-field">Nome da nova rota<input id="routeName" type="text" maxlength="120" placeholder="Ex.: Rota manhã" /></label>
             <button id="loadRoutesButton" type="button" class="secondary-button">Consultar</button>
+            <button id="showAllRoutesButton" type="button" class="secondary-button">Todas as datas</button>
             <button id="createRouteButton" type="button" class="supervisor-only">Criar rota do dia</button>
           </div>
           <p class="route-rule">Toda rota começa na base da empresa e retorna para a mesma base após a última parada.</p>
@@ -80,16 +83,25 @@
             <p id="emptyRouteText">Escolha um técnico e uma data para consultar ou criar o planejamento.</p>
           </div>
 
+          <section id="routesDashboard" class="routes-dashboard hidden">
+            <div class="dashboard-heading">
+              <div><p class="eyebrow">Visão rápida</p><h2 id="routesDashboardTitle">Rotas encontradas</h2></div>
+              <strong id="routesDashboardCount" class="dashboard-count">0 rotas</strong>
+            </div>
+            <div id="routeCards" class="route-cards"></div>
+          </section>
+
           <div id="routeWorkspace" class="route-workspace hidden">
             <section class="route-sidebar">
+              <button id="backToRoutesButton" type="button" class="back-dashboard-button secondary-button">← Voltar para as rotas</button>
               <div class="route-heading">
-                <div><p id="routeDateLabel" class="eyebrow">-</p><h2 id="routeTechnicianName">-</h2></div>
+                <div><p id="routeDateLabel" class="eyebrow">-</p><h2 id="routeTitle">-</h2><p id="routeTechnicianName" class="route-technician-name">-</p></div>
                 <span id="routeStatus" class="status-pill">Rascunho</span>
               </div>
               <div class="route-summary">
                 <div><span>Paradas</span><strong id="summaryStops">0</strong></div>
                 <div><span>Distância</span><strong id="summaryDistance">-</strong></div>
-                <div><span>Duração</span><strong id="summaryDuration">-</strong></div>
+                <div><span>Tempo de percurso</span><strong id="summaryDuration">-</strong></div>
               </div>
               <div id="routeWarning" class="alert warning hidden"></div>
 
@@ -97,6 +109,7 @@
                 <button id="newStopButton" type="button" class="secondary-button">+ Adicionar parada</button>
                 <button id="optimizeButton" type="button">Otimizar rota</button>
                 <button id="publishButton" type="button" class="success-button">Publicar</button>
+                <button id="deleteRouteButton" type="button" class="danger-button">Excluir rota</button>
               </div>
               <a id="openFullRoute" href="#" class="map-link hidden" target="_blank" rel="noopener">Abrir rota no Google Maps</a>
 
@@ -109,6 +122,7 @@
                   <button id="searchStopAddress" type="button" class="secondary-button">Buscar endereço</button>
                   <button id="markStopMap" type="button" class="secondary-button">Marcar no mapa</button>
                 </div>
+                <p class="address-search-hint">A busca prioriza endereços em Pernambuco e usa a base da empresa como referência de proximidade.</p>
                 <p id="stopGeocodeHelp" class="helper-text hidden">Busca automática não configurada. Use “Marcar no mapa” ou configure ORS_API_KEY.</p>
                 <div id="stopSearchResults" class="search-results hidden"></div>
                 <div class="two-columns">
@@ -160,6 +174,7 @@
             <form id="companyForm" class="company-form">
               <label>Nome da base<input id="companyName" type="text" required maxlength="120" /></label>
               <label>Endereço completo da base<textarea id="companyAddress" required maxlength="300"></textarea></label>
+              <p class="address-search-hint">Informe rua, número, bairro e cidade. A busca prioriza Pernambuco.</p>
               <div class="inline-actions"><button id="searchCompanyAddress" type="button" class="secondary-button">Buscar endereço</button><button id="markCompanyMap" type="button" class="secondary-button">Marcar no mapa</button></div>
               <p id="companyGeocodeHelp" class="helper-text hidden">Busca automática não configurada. Use “Marcar no mapa” ou configure ORS_API_KEY.</p>
               <div id="companySearchResults" class="search-results hidden"></div>
@@ -175,6 +190,6 @@
 
     <div id="toastRegion" class="toast-region" aria-live="polite"></div>
     <script src="/vendor/leaflet/leaflet.js?v=1.9.4"></script>
-    <script src="rotas.js?v=1.0.4"></script>
+    <script src="rotas.js?v=1.1.0"></script>
   </body>
 </html>

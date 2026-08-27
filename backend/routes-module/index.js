@@ -66,9 +66,6 @@ function validServiceDuration(value) {
 
 function translateDatabaseError(error) {
   if (error.code === "23505") {
-    if (error.constraint === "rotas_planos_tecnico_id_data_key") {
-      return httpError("Este tecnico ja possui uma rota nesta data.", 409);
-    }
     if (error.constraint === "idx_rotas_usuarios_usuario_unico") {
       return httpError("Este usuario ja esta cadastrado.", 409);
     }
@@ -280,7 +277,13 @@ function createRoutesRouter(pool) {
 
   router.post("/geocodificar", auth.requireSupervisor, auth.requireCsrf, asyncRoute(async (req, res) => {
     const address = requiredText(req.body?.endereco, "o endereco", 300);
-    res.json(await geocodeAddress(address));
+    const reference = {
+      latitude: req.body?.referenciaLatitude === undefined
+        ? undefined : validCoordinate(req.body.referenciaLatitude, "latitude"),
+      longitude: req.body?.referenciaLongitude === undefined
+        ? undefined : validCoordinate(req.body.referenciaLongitude, "longitude"),
+    };
+    res.json(await geocodeAddress(address, reference));
   }));
 
   router.get("/planos", asyncRoute(async (req, res) => {
@@ -301,9 +304,30 @@ function createRoutesRouter(pool) {
     const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
     const result = await pool.query(
       `SELECT p.*, t.nome AS tecnico_nome,
-              (SELECT COUNT(*)::int FROM rotas_paradas rp WHERE rp.plano_id = p.id) AS total_paradas
-       FROM rotas_planos p JOIN rotas_tecnicos t ON t.id = p.tecnico_id
-       ${where} ORDER BY p.data DESC, t.nome LIMIT 200`,
+              COUNT(rp.id)::int AS total_paradas,
+              COALESCE(SUM(rp.duracao_atendimento_min), 0)::int AS duracao_clientes_min,
+              COALESCE(
+                JSONB_AGG(
+                  JSONB_BUILD_OBJECT(
+                    'id', rp.id,
+                    'ordem', rp.ordem,
+                    'cliente', rp.cliente,
+                    'endereco', rp.endereco,
+                    'duracao_atendimento_min', rp.duracao_atendimento_min,
+                    'horario_inicio', rp.horario_inicio,
+                    'horario_fim', rp.horario_fim,
+                    'status', rp.status
+                  ) ORDER BY rp.ordem, rp.id
+                ) FILTER (WHERE rp.id IS NOT NULL),
+                '[]'::jsonb
+              ) AS paradas
+       FROM rotas_planos p
+       JOIN rotas_tecnicos t ON t.id = p.tecnico_id
+       LEFT JOIN rotas_paradas rp ON rp.plano_id = p.id
+       ${where}
+       GROUP BY p.id, t.id
+       ORDER BY p.data DESC, p.criado_em DESC
+       LIMIT 200`,
       params,
     );
     res.json(result.rows);
@@ -313,6 +337,7 @@ function createRoutesRouter(pool) {
     try {
       const technicianId = positiveId(req.body?.tecnicoId, "Tecnico");
       const date = validDate(req.body?.data);
+      let title = optionalText(req.body?.titulo, 120);
       const [technician, config] = await Promise.all([
         pool.query("SELECT id FROM rotas_tecnicos WHERE id = $1 AND ativo = TRUE", [technicianId]),
         pool.query("SELECT * FROM rotas_configuracao WHERE id = 1"),
@@ -323,13 +348,20 @@ function createRoutesRouter(pool) {
         || (settings.empresa_latitude === 0 && settings.empresa_longitude === 0)) {
         throw httpError("Configure o endereco e o ponto da base da empresa antes de criar rotas.", 409);
       }
+      if (!title) {
+        const total = await pool.query(
+          "SELECT COUNT(*)::int AS total FROM rotas_planos WHERE tecnico_id = $1 AND data = $2",
+          [technicianId, date],
+        );
+        title = `Rota ${total.rows[0].total + 1}`;
+      }
       const result = await pool.query(
         `INSERT INTO rotas_planos
-         (tecnico_id, data, retornar_empresa, origem_nome, origem_endereco,
+         (tecnico_id, data, titulo, retornar_empresa, origem_nome, origem_endereco,
           origem_latitude, origem_longitude, criado_por)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
-        [technicianId, date, true, settings.empresa_nome, settings.empresa_endereco,
+        [technicianId, date, title, true, settings.empresa_nome, settings.empresa_endereco,
           settings.empresa_latitude, settings.empresa_longitude, req.routeUser.id],
       );
       res.status(201).json(result.rows[0]);
@@ -346,14 +378,22 @@ function createRoutesRouter(pool) {
     const id = positiveId(req.params.id);
     const plan = await getPlan(pool, id, req.routeUser);
     const status = req.body?.status ?? plan.status;
+    const title = req.body?.titulo === undefined ? plan.titulo : requiredText(req.body.titulo, "o nome da rota", 120);
     if (!['rascunho', 'otimizada', 'publicada', 'concluida'].includes(status)) throw httpError("Status invalido.");
     if (status === "publicada" && !plan.geometria) throw httpError("Otimize a rota antes de publicar.", 409);
     const result = await pool.query(
-      `UPDATE rotas_planos SET status = $1, retornar_empresa = $2, atualizado_em = NOW()
+      `UPDATE rotas_planos SET status = $1, titulo = $2, retornar_empresa = TRUE, atualizado_em = NOW()
        WHERE id = $3 RETURNING *`,
-      [status, true, id],
+      [status, title, id],
     );
     res.json(result.rows[0]);
+  }));
+
+  router.delete("/planos/:id", auth.requireSupervisor, auth.requireCsrf, asyncRoute(async (req, res) => {
+    const id = positiveId(req.params.id);
+    await getPlan(pool, id, req.routeUser);
+    await pool.query("DELETE FROM rotas_planos WHERE id = $1", [id]);
+    res.status(204).end();
   }));
 
   router.post("/planos/:id/paradas", auth.requireSupervisor, auth.requireCsrf, asyncRoute(async (req, res) => {

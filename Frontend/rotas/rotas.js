@@ -6,7 +6,10 @@ const state = {
   csrfToken: null,
   technicians: [],
   users: [],
+  plans: [],
   plan: null,
+  companyConfig: null,
+  lastPlanQuery: null,
   routeMap: null,
   companyMap: null,
   routeLayers: null,
@@ -15,6 +18,9 @@ const state = {
   pinMode: null,
   capabilities: { buscaAutomatica: false, calculoViario: false },
 };
+
+let activeRequests = 0;
+let loadingTimer = null;
 
 function element(id) { return document.getElementById(id); }
 function show(id, visible = true) { element(id)?.classList.toggle("hidden", !visible); }
@@ -29,24 +35,37 @@ async function readError(response) {
 }
 
 async function request(path, options = {}) {
+  activeRequests += 1;
+  if (activeRequests === 1) {
+    loadingTimer = setTimeout(() => show("globalLoading", true), 120);
+  }
   const headers = { ...(options.headers || {}) };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   if (state.csrfToken && !["GET", "HEAD"].includes(options.method || "GET")) {
     headers["X-CSRF-Token"] = state.csrfToken;
   }
-  let response;
   try {
-    response = await fetch(`${API}${path}`, { credentials: "include", ...options, headers });
-  } catch (_error) {
-    throw new Error("Não foi possível acessar o servidor de rotas. Abra o módulo pelo endereço do backend.");
+    let response;
+    try {
+      response = await fetch(`${API}${path}`, { credentials: "include", ...options, headers });
+    } catch (_error) {
+      throw new Error("Não foi possível acessar o servidor de rotas. Abra o módulo pelo endereço do backend.");
+    }
+    if (!response.ok) {
+      const message = await readError(response);
+      if (response.status === 401 && state.user) return forceLogout(message);
+      throw new Error(message);
+    }
+    if (response.status === 204) return null;
+    return response.json();
+  } finally {
+    activeRequests = Math.max(0, activeRequests - 1);
+    if (activeRequests === 0) {
+      clearTimeout(loadingTimer);
+      loadingTimer = null;
+      show("globalLoading", false);
+    }
   }
-  if (!response.ok) {
-    const message = await readError(response);
-    if (response.status === 401 && state.user) return forceLogout(message);
-    throw new Error(message);
-  }
-  if (response.status === 204) return null;
-  return response.json();
 }
 
 function forceLogout(message) {
@@ -308,7 +327,7 @@ function renderTechnicians() {
   element("techniciansTable").innerHTML = state.technicians.length ? state.technicians.map((item) => `
     <tr><td>${escapeHTML(item.nome)}</td><td>${escapeHTML(item.telefone || "-")}</td>
       <td class="${item.ativo ? "active-text" : "inactive-text"}">${item.ativo ? "Ativo" : "Inativo"}</td>
-      <td><button class="small-button ${item.ativo ? "danger-button" : ""}" onclick="toggleTechnician(${item.id}, ${!item.ativo})">${item.ativo ? "Inativar" : "Ativar"}</button></td></tr>`).join("")
+      <td><button class="small-button ${item.ativo ? "danger-button" : ""}" data-action="toggle-technician" data-id="${item.id}" data-active="${!item.ativo}">${item.ativo ? "Inativar" : "Ativar"}</button></td></tr>`).join("")
     : '<tr><td colspan="4">Nenhum técnico externo cadastrado.</td></tr>';
 }
 
@@ -339,8 +358,8 @@ function renderUsers() {
   element("usersTable").innerHTML = state.users.length ? state.users.map((item) => `
     <tr><td>${escapeHTML(item.nome)}</td><td>${escapeHTML(item.usuario)}</td><td>${roleLabel(item.perfil)}</td>
       <td>${escapeHTML(item.tecnico_nome || "-")}</td><td class="${item.ativo ? "active-text" : "inactive-text"}">${item.ativo ? "Ativo" : "Inativo"}</td>
-      <td><div class="table-actions"><button class="small-button secondary-button" onclick="resetUserPassword(${item.id})" ${item.id === state.user.id ? "disabled title=\"Use a troca de senha do proprio acesso\"" : ""}>Nova senha</button>
-      <button class="small-button ${item.ativo ? "danger-button" : ""}" onclick="toggleUser(${item.id}, ${!item.ativo})">${item.ativo ? "Inativar" : "Ativar"}</button></div></td></tr>`).join("")
+      <td><div class="table-actions"><button class="small-button secondary-button" data-action="reset-user-password" data-id="${item.id}" ${item.id === state.user.id ? "disabled title=\"Use a troca de senha do proprio acesso\"" : ""}>Nova senha</button>
+      <button class="small-button ${item.ativo ? "danger-button" : ""}" data-action="toggle-user" data-id="${item.id}" data-active="${!item.ativo}">${item.ativo ? "Inativar" : "Ativar"}</button></div></td></tr>`).join("")
     : '<tr><td colspan="6">Nenhum usuário cadastrado.</td></tr>';
 }
 
@@ -388,6 +407,7 @@ async function resetUserPassword(id) {
 
 async function loadCompanyConfig() {
   const config = await request("/configuracao");
+  state.companyConfig = config;
   element("companyName").value = config.empresa_nome || "Empresa";
   element("companyAddress").value = config.empresa_endereco || "";
   element("companyLatitude").value = config.empresa_latitude ?? "";
@@ -435,8 +455,14 @@ async function saveCompany(event) {
 
 async function searchAddress(address, resultsId, onSelect) {
   if (!address.trim()) return toast("Informe o endereço.", "error");
+  const searchButton = resultsId === "companySearchResults" ? element("searchCompanyAddress") : element("searchStopAddress");
+  setBusy(searchButton, true, "Buscando...");
   try {
-    const results = await request("/geocodificar", { method: "POST", body: JSON.stringify({ endereco: address }) });
+    const results = await request("/geocodificar", { method: "POST", body: JSON.stringify({
+      endereco: address,
+      referenciaLatitude: state.companyConfig?.empresa_latitude ?? DEFAULT_CENTER[0],
+      referenciaLongitude: state.companyConfig?.empresa_longitude ?? DEFAULT_CENTER[1],
+    }) });
     const container = element(resultsId);
     if (!results.length) throw new Error("Nenhum endereço encontrado.");
     container.innerHTML = "";
@@ -444,58 +470,152 @@ async function searchAddress(address, resultsId, onSelect) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "search-result";
-      button.textContent = result.endereco;
+      const title = document.createElement("strong");
+      title.textContent = result.endereco;
+      button.appendChild(title);
+      if (result.cidade || result.estado || result.cep) {
+        const details = document.createElement("span");
+        details.textContent = [result.cidade, result.estado, result.cep].filter(Boolean).join(" • ");
+        button.appendChild(details);
+      }
       button.addEventListener("click", () => { onSelect(result); show(resultsId, false); });
       container.appendChild(button);
     });
     show(resultsId, true);
-  } catch (error) { toast(error.message, "error"); }
+  } catch (error) { toast(error.message, "error"); } finally { setBusy(searchButton, false); }
 }
 
-async function loadPlans() {
+function planTotalDuration(plan) {
+  return Number(plan.duracao_segundos || 0) + Number(plan.duracao_clientes_min || 0) * 60;
+}
+
+function renderPlanCards() {
+  const container = element("routeCards");
+  container.innerHTML = state.plans.map((plan) => {
+    const stops = Array.isArray(plan.paradas) ? plan.paradas : [];
+    const destinations = stops.slice(0, 4).map((stop) => `
+      <li><span>${escapeHTML(stop.cliente)} — ${escapeHTML(stop.endereco)}</span><strong>${Number(stop.duracao_atendimento_min || 0)} min</strong></li>`).join("");
+    const remaining = stops.length > 4 ? `<li><span>+ ${stops.length - 4} cliente(s)</span><strong>ver detalhes</strong></li>` : "";
+    const deleteButton = state.user.perfil === "supervisor"
+      ? `<button type="button" class="danger-button delete-card-button" data-action="delete-plan" data-id="${plan.id}" title="Excluir rota">Excluir</button>` : "";
+    return `<article class="route-card">
+      <div class="route-card-header"><div><p class="eyebrow">${formatDate(plan.data)}</p><h3>${escapeHTML(plan.titulo || `Rota #${plan.id}`)}</h3><p>${escapeHTML(plan.tecnico_nome)}</p></div><span class="status-pill">${statusLabel(plan.status)}</span></div>
+      <div class="route-card-metrics">
+        <div><span>Paradas</span><strong>${Number(plan.total_paradas || 0)}</strong></div>
+        <div><span>Distância</span><strong>${formatDistance(plan.distancia_metros)}</strong></div>
+        <div><span>Tempo total</span><strong>${formatDuration(planTotalDuration(plan))}</strong></div>
+      </div>
+      <ul class="route-destinations">${destinations || '<li><span>Nenhum cliente adicionado</span><strong>-</strong></li>'}${remaining}</ul>
+      <div class="route-card-actions"><button type="button" data-action="open-plan" data-id="${plan.id}">Detalhes e mapa</button>${deleteButton}</div>
+    </article>`;
+  }).join("");
+}
+
+function showPlanDashboard() {
+  state.plan = null;
+  show("routeWorkspace", false);
+  show("emptyRoute", false);
+  show("routesDashboard", true);
+  const date = state.lastPlanQuery?.allDates ? "todas as datas" : formatDate(state.lastPlanQuery?.date);
+  const technician = state.user.perfil === "supervisor"
+    ? state.technicians.find((item) => String(item.id) === String(state.lastPlanQuery?.technicianId))?.nome
+    : state.user.tecnicoNome || state.user.nome;
+  element("routesDashboardTitle").textContent = `${technician || "Técnico"} • ${date}`;
+  element("routesDashboardCount").textContent = `${state.plans.length} ${state.plans.length === 1 ? "rota" : "rotas"}`;
+  renderPlanCards();
+}
+
+async function loadPlans(options = {}) {
+  const allDates = options.allDates === true;
   const date = element("routeDate").value;
-  if (!date) return toast("Selecione uma data.", "error");
+  if (!allDates && !date) return toast("Selecione uma data.", "error");
   const technicianId = state.user.perfil === "supervisor" ? element("routeTechnician").value : "";
   if (state.user.perfil === "supervisor" && !technicianId) return toast("Selecione um técnico.", "error");
-  const query = new URLSearchParams({ data });
+  const query = new URLSearchParams();
+  if (!allDates) query.set("data", date);
   if (technicianId) query.set("tecnicoId", technicianId);
+  const button = element("loadRoutesButton");
+  setBusy(button, true, "Consultando...");
   try {
-    const plans = await request(`/planos?${query}`);
-    if (!plans.length) {
+    state.plans = await request(`/planos?${query}`);
+    state.lastPlanQuery = { allDates, date, technicianId };
+    if (!state.plans.length) {
       state.plan = null;
       show("routeWorkspace", false);
+      show("routesDashboard", false);
       show("emptyRoute", true);
       element("emptyRouteText").textContent = state.user.perfil === "tecnico"
         ? "Nenhuma rota foi criada para você nesta data."
         : "Nenhuma rota encontrada. Use “Criar rota do dia”.";
       return;
     }
-    await openPlan(plans[0].id);
-  } catch (error) { toast(error.message, "error"); }
+    showPlanDashboard();
+  } catch (error) { toast(error.message, "error"); } finally { setBusy(button, false); }
 }
 
 async function createPlan() {
   const technicianId = Number(element("routeTechnician").value);
   const date = element("routeDate").value;
   if (!technicianId || !date) return toast("Selecione o técnico e a data.", "error");
+  const button = element("createRouteButton");
+  setBusy(button, true, "Criando...");
   try {
-    const plan = await request("/planos", { method: "POST", body: JSON.stringify({ tecnicoId: technicianId, data: date }) });
-    await openPlan(plan.id);
+    const plan = await request("/planos", { method: "POST", body: JSON.stringify({
+      tecnicoId: technicianId,
+      data: date,
+      titulo: element("routeName").value,
+    }) });
+    element("routeName").value = "";
+    state.lastPlanQuery = { allDates: false, date, technicianId: String(technicianId) };
+    state.plan = {
+      ...plan,
+      tecnico_nome: state.technicians.find((item) => item.id === technicianId)?.nome || "Técnico",
+      paradas: [],
+    };
+    showPlanDetail();
     toast("Rota do dia criada.");
-  } catch (error) { toast(error.message, "error"); }
+  } catch (error) { toast(error.message, "error"); } finally { setBusy(button, false); }
 }
 
 async function openPlan(id) {
-  state.plan = await request(`/planos/${id}`);
+  try {
+    state.plan = await request(`/planos/${id}`);
+    showPlanDetail();
+  } catch (error) {
+    toast(error.message, "error");
+  }
+}
+
+function showPlanDetail() {
   renderPlan();
   show("emptyRoute", false);
+  show("routesDashboard", false);
   show("routeWorkspace", true);
   setTimeout(() => state.routeMap.invalidateSize(), 50);
+}
+
+async function backToRoutes() {
+  if (state.lastPlanQuery) await loadPlans({ allDates: state.lastPlanQuery.allDates });
+  else showPlanDashboard();
+}
+
+async function deletePlan(id) {
+  const plan = state.plans.find((item) => item.id === id) || (state.plan?.id === id ? state.plan : null);
+  if (!window.confirm(`Excluir ${plan?.titulo || "esta rota"} e todas as suas paradas?`)) return;
+  try {
+    await request(`/planos/${id}`, { method: "DELETE" });
+    state.plans = state.plans.filter((item) => item.id !== id);
+    if (state.plan?.id === id) state.plan = null;
+    toast("Rota excluída.");
+    if (state.plans.length) showPlanDashboard();
+    else await loadPlans({ allDates: state.lastPlanQuery?.allDates === true });
+  } catch (error) { toast(error.message, "error"); }
 }
 
 function renderPlan() {
   const plan = state.plan;
   element("routeDateLabel").textContent = formatDate(plan.data);
+  element("routeTitle").textContent = plan.titulo || `Rota #${plan.id}`;
   element("routeTechnicianName").textContent = plan.tecnico_nome;
   element("routeStatus").textContent = statusLabel(plan.status);
   element("summaryStops").textContent = plan.paradas.length;
@@ -508,6 +628,16 @@ function renderPlan() {
   renderStops();
   renderRouteMap();
   renderGoogleRouteLink();
+}
+
+function invalidateLocalPlan() {
+  state.plan.status = "rascunho";
+  state.plan.distancia_metros = null;
+  state.plan.duracao_segundos = null;
+  state.plan.geometria = null;
+  state.plan.provedor_rota = null;
+  state.plan.aviso_calculo = null;
+  state.plan.calculada_em = null;
 }
 
 function stopStatusLabel(status) {
@@ -523,14 +653,14 @@ function renderStops() {
   element("stopsList").innerHTML = stops.map((stop, index) => {
     const time = stop.horario_inicio ? `${String(stop.horario_inicio).slice(0, 5)}${stop.horario_fim ? `–${String(stop.horario_fim).slice(0, 5)}` : ""}` : "Sem horário";
     const supervisorActions = state.user.perfil === "supervisor" ? `
-      <button class="secondary-button" onclick="moveStop(${stop.id}, -1)" ${index === 0 ? "disabled" : ""}>↑</button>
-      <button class="secondary-button" onclick="moveStop(${stop.id}, 1)" ${index === stops.length - 1 ? "disabled" : ""}>↓</button>
-      <button class="secondary-button" onclick="editStop(${stop.id})">Editar</button>
-      <button class="danger-button" onclick="removeStop(${stop.id})">Excluir</button>` : "";
+      <button class="secondary-button" data-action="move-stop" data-id="${stop.id}" data-direction="-1" ${index === 0 ? "disabled" : ""}>↑</button>
+      <button class="secondary-button" data-action="move-stop" data-id="${stop.id}" data-direction="1" ${index === stops.length - 1 ? "disabled" : ""}>↓</button>
+      <button class="secondary-button" data-action="edit-stop" data-id="${stop.id}">Editar</button>
+      <button class="danger-button" data-action="remove-stop" data-id="${stop.id}">Excluir</button>` : "";
     const statusActions = state.plan.status === "publicada" && stop.status !== "concluida" ? `
-      <button class="secondary-button" onclick="updateStopStatus(${stop.id}, 'em_atendimento')">Iniciar</button>
-      <button onclick="updateStopStatus(${stop.id}, 'concluida')">Concluir</button>
-      <button class="danger-button" onclick="updateStopStatus(${stop.id}, 'nao_realizada')">Não realizada</button>` : "";
+      <button class="secondary-button" data-action="update-stop-status" data-id="${stop.id}" data-status="em_atendimento">Iniciar</button>
+      <button data-action="update-stop-status" data-id="${stop.id}" data-status="concluida">Concluir</button>
+      <button class="danger-button" data-action="update-stop-status" data-id="${stop.id}" data-status="nao_realizada">Não realizada</button>` : "";
     return `<article class="stop-card ${stop.status === "concluida" ? "done" : ""}">
       <div class="stop-head"><span class="stop-number">${index + 1}</span><div><h3>${escapeHTML(stop.cliente)}</h3><p>${escapeHTML(stop.endereco)}</p></div></div>
       <div class="stop-meta"><span>${time}</span><span>${stop.duracao_atendimento_min} min</span><span>${stopStatusLabel(stop.status)}</span></div>
@@ -602,6 +732,7 @@ function cancelStopForm() {
 
 async function saveStop(event) {
   event.preventDefault();
+  const button = event.submitter;
   const stopId = element("editingStopId").value;
   const payload = {
     cliente: element("stopClient").value,
@@ -613,14 +744,21 @@ async function saveStop(event) {
     duracaoAtendimentoMin: Number(element("stopDuration").value),
     observacoes: element("stopNotes").value,
   };
+  setBusy(button, true, "Salvando...");
   try {
-    await request(stopId ? `/planos/${state.plan.id}/paradas/${stopId}` : `/planos/${state.plan.id}/paradas`, {
+    const savedStop = await request(stopId ? `/planos/${state.plan.id}/paradas/${stopId}` : `/planos/${state.plan.id}/paradas`, {
       method: stopId ? "PATCH" : "POST", body: JSON.stringify(payload),
     });
+    if (stopId) {
+      state.plan.paradas = state.plan.paradas.map((stop) => stop.id === savedStop.id ? savedStop : stop);
+    } else {
+      state.plan.paradas.push(savedStop);
+    }
+    invalidateLocalPlan();
     cancelStopForm();
-    await openPlan(state.plan.id);
+    renderPlan();
     toast(stopId ? "Parada atualizada." : "Parada adicionada.");
-  } catch (error) { toast(error.message, "error"); }
+  } catch (error) { toast(error.message, "error"); } finally { setBusy(button, false); }
 }
 
 function editStop(id) { openStopForm(state.plan.paradas.find((stop) => stop.id === id)); }
@@ -629,7 +767,12 @@ async function removeStop(id) {
   if (!window.confirm("Excluir esta parada da rota?")) return;
   try {
     await request(`/planos/${state.plan.id}/paradas/${id}`, { method: "DELETE" });
-    await openPlan(state.plan.id); toast("Parada removida.");
+    state.plan.paradas = state.plan.paradas
+      .filter((stop) => stop.id !== id)
+      .map((stop, index) => ({ ...stop, ordem: index + 1 }));
+    invalidateLocalPlan();
+    renderPlan();
+    toast("Parada removida.");
   } catch (error) { toast(error.message, "error"); }
 }
 
@@ -650,21 +793,48 @@ async function optimizePlan() {
   try {
     state.plan = await request(`/planos/${state.plan.id}/otimizar`, { method: "POST", body: "{}" });
     renderPlan(); toast(state.plan.provedor_rota === "estimativa-linear" ? "Estimativa gerada. Configure o serviço viário para uma rota pelas ruas." : "Rota otimizada pelas ruas.");
-  } catch (error) { toast(error.message, "error"); } finally { setBusy(button, false); }
+  } catch (error) { toast(error.message, "error"); } finally { setBusy(button, false); if (state.plan) renderPlan(); }
 }
 
 async function publishPlan() {
+  const button = element("publishButton");
+  setBusy(button, true, "Publicando...");
   try {
-    await request(`/planos/${state.plan.id}`, { method: "PATCH", body: JSON.stringify({ status: "publicada" }) });
-    await openPlan(state.plan.id); toast("Rota publicada para o técnico.");
-  } catch (error) { toast(error.message, "error"); }
+    const updated = await request(`/planos/${state.plan.id}`, { method: "PATCH", body: JSON.stringify({ status: "publicada" }) });
+    state.plan = { ...state.plan, ...updated };
+    renderPlan();
+    toast("Rota publicada para o técnico.");
+  } catch (error) { toast(error.message, "error"); } finally { setBusy(button, false); if (state.plan) renderPlan(); }
 }
 
 async function updateStopStatus(id, status) {
   try {
-    await request(`/planos/${state.plan.id}/paradas/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
-    await openPlan(state.plan.id); toast("Status atualizado.");
+    const updatedStop = await request(`/planos/${state.plan.id}/paradas/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+    state.plan.paradas = state.plan.paradas.map((stop) => stop.id === id ? updatedStop : stop);
+    if (state.plan.paradas.every((stop) => ["concluida", "nao_realizada"].includes(stop.status))) {
+      state.plan.status = "concluida";
+    }
+    renderPlan();
+    toast("Status atualizado.");
   } catch (error) { toast(error.message, "error"); }
+}
+
+function handleDelegatedAction(event) {
+  const button = event.target.closest("[data-action]");
+  if (!button || button.disabled) return;
+  const id = Number(button.dataset.id);
+  const actions = {
+    "toggle-technician": () => toggleTechnician(id, button.dataset.active === "true"),
+    "reset-user-password": () => resetUserPassword(id),
+    "toggle-user": () => toggleUser(id, button.dataset.active === "true"),
+    "open-plan": () => openPlan(id),
+    "delete-plan": () => deletePlan(id),
+    "move-stop": () => moveStop(id, Number(button.dataset.direction)),
+    "edit-stop": () => editStop(id),
+    "remove-stop": () => removeStop(id),
+    "update-stop-status": () => updateStopStatus(id, button.dataset.status),
+  };
+  actions[button.dataset.action]?.();
 }
 
 function bindEvents() {
@@ -674,8 +844,21 @@ function bindEvents() {
   element("changePasswordButton").addEventListener("click", openPasswordChange);
   element("cancelPasswordButton").addEventListener("click", cancelPasswordChange);
   document.querySelectorAll(".nav-item").forEach((button) => button.addEventListener("click", () => switchPanel(button.dataset.panel, button)));
-  element("loadRoutesButton").addEventListener("click", loadPlans);
+  element("loadRoutesButton").addEventListener("click", () => loadPlans());
+  element("showAllRoutesButton").addEventListener("click", () => loadPlans({ allDates: true }));
+  element("routeTechnician").addEventListener("change", () => {
+    if (element("routeTechnician").value) loadPlans({ allDates: true });
+    else {
+      state.plans = [];
+      show("routesDashboard", false);
+      show("routeWorkspace", false);
+      show("emptyRoute", true);
+      element("emptyRouteText").textContent = "Selecione um técnico para visualizar as rotas.";
+    }
+  });
   element("createRouteButton").addEventListener("click", createPlan);
+  element("backToRoutesButton").addEventListener("click", backToRoutes);
+  element("deleteRouteButton").addEventListener("click", () => deletePlan(state.plan.id));
   element("newStopButton").addEventListener("click", () => openStopForm());
   element("cancelStopButton").addEventListener("click", cancelStopForm);
   element("stopForm").addEventListener("submit", saveStop);
@@ -696,15 +879,8 @@ function bindEvents() {
   element("searchCompanyAddress").addEventListener("click", () => searchAddress(element("companyAddress").value, "companySearchResults", (result) => {
     element("companyAddress").value = result.endereco; setCompanyCoordinates(result.latitude, result.longitude);
   }));
+  document.addEventListener("click", handleDelegatedAction);
 }
-
-window.toggleTechnician = toggleTechnician;
-window.toggleUser = toggleUser;
-window.resetUserPassword = resetUserPassword;
-window.moveStop = moveStop;
-window.editStop = editStop;
-window.removeStop = removeStop;
-window.updateStopStatus = updateStopStatus;
 
 bindEvents();
 updateUserRoleForm();
