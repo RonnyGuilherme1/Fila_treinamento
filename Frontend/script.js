@@ -29,6 +29,10 @@ const CONFIG_FILA_META = {
   },
 };
 
+function abrirRotasExternas() {
+  window.location.href = `${API}/rotas/rotas.html`;
+}
+
 // =============================
 // HELPERS
 // =============================

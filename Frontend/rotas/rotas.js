@@ -33,7 +33,12 @@ async function request(path, options = {}) {
   if (state.csrfToken && !["GET", "HEAD"].includes(options.method || "GET")) {
     headers["X-CSRF-Token"] = state.csrfToken;
   }
-  const response = await fetch(`${API}${path}`, { credentials: "include", ...options, headers });
+  let response;
+  try {
+    response = await fetch(`${API}${path}`, { credentials: "include", ...options, headers });
+  } catch (_error) {
+    throw new Error("Não foi possível acessar o servidor de rotas. Abra o módulo pelo endereço do backend.");
+  }
   if (!response.ok) {
     const message = await readError(response);
     if (response.status === 401 && state.user) return forceLogout(message);
