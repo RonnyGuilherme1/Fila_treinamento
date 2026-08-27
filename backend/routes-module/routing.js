@@ -1,6 +1,19 @@
 const { httpError } = require("./auth");
 
-const ORS_BASE_URL = String(process.env.ORS_BASE_URL || "https://api.openrouteservice.org").replace(/\/$/, "");
+const ORS_CUSTOM_BASE_URL = process.env.ORS_BASE_URL
+  ? String(process.env.ORS_BASE_URL).replace(/\/$/, "")
+  : null;
+const ORS_ENDPOINTS = ORS_CUSTOM_BASE_URL
+  ? {
+    optimization: `${ORS_CUSTOM_BASE_URL}/optimization`,
+    directions: `${ORS_CUSTOM_BASE_URL}/v2/directions/driving-car/geojson`,
+    geocode: `${ORS_CUSTOM_BASE_URL}/geocode/search`,
+  }
+  : {
+    optimization: "https://api.heigit.org/vroom/v0",
+    directions: "https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson",
+    geocode: "https://api.heigit.org/pelias/v1/search",
+  };
 
 function haversineMeters(a, b) {
   const radius = 6371000;
@@ -102,7 +115,7 @@ async function orsRoute(origin, stops, returnToOrigin, apiKey) {
     }],
   };
 
-  const optimized = await fetchJson(`${ORS_BASE_URL}/optimization`, {
+  const optimized = await fetchJson(ORS_ENDPOINTS.optimization, {
     method: "POST",
     headers: { Authorization: apiKey, "Content-Type": "application/json" },
     body: JSON.stringify(optimizationPayload),
@@ -120,7 +133,7 @@ async function orsRoute(origin, stops, returnToOrigin, apiKey) {
     ...(returnToOrigin ? [[origin.longitude, origin.latitude]] : []),
   ];
 
-  const directions = await fetchJson(`${ORS_BASE_URL}/v2/directions/driving-car/geojson`, {
+  const directions = await fetchJson(ORS_ENDPOINTS.directions, {
     method: "POST",
     headers: { Authorization: apiKey, "Content-Type": "application/json" },
     body: JSON.stringify({ coordinates, instructions: false }),
@@ -163,7 +176,7 @@ async function geocodeAddress(address) {
   if (!apiKey) {
     throw httpError("Busca automatica nao configurada. Marque o ponto diretamente no mapa ou configure ORS_API_KEY.", 409);
   }
-  const url = new URL(`${ORS_BASE_URL}/geocode/search`);
+  const url = new URL(ORS_ENDPOINTS.geocode);
   url.searchParams.set("api_key", apiKey);
   url.searchParams.set("text", address);
   url.searchParams.set("boundary.country", "BR");

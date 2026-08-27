@@ -29,8 +29,8 @@ essa limitacao; ela nao deve ser tratada como navegacao real.
 
 Para localizar enderecos e calcular a sequencia e o trajeto pelas ruas, configure:
 
-- `ORS_API_KEY`: chave da API openrouteservice;
-- `ORS_BASE_URL`: URL alternativa para uma instancia propria, opcional;
+- `ORS_API_KEY`: chave da API openrouteservice/HeiGIT;
+- `ORS_BASE_URL`: URL alternativa apenas para uma instancia propria, opcional. Sem essa variavel, o modulo usa os endpoints atuais de `api.heigit.org`;
 - `ROUTES_REQUIRE_ROAD_ROUTING=true`: opcional; impede fallback linear quando o
   provedor viario falhar.
 

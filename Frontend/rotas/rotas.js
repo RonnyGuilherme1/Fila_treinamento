@@ -110,17 +110,16 @@ function initMap(target, center = DEFAULT_CENTER) {
   const map = L.map(target, { zoomControl: true }).setView(center, 12);
   let tileErrors = 0;
   let usingFallback = false;
-  const primaryTiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-    subdomains: "abcd",
-    maxZoom: 20,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  const primaryTiles = L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   });
   primaryTiles.on("tileerror", () => {
     tileErrors += 1;
     if (tileErrors < 4 || usingFallback) return;
     usingFallback = true;
     map.removeLayer(primaryTiles);
-    L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
