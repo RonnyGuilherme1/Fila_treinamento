@@ -38,6 +38,33 @@ As chaves permanecem apenas no backend. O mapa do piloto utiliza Leaflet e os
 tiles publicos do OpenStreetMap com atribuicao visivel. Para volume de producao,
 troque os tiles publicos por um provedor gerenciado compatível com OpenStreetMap.
 
+A busca acrescenta contexto de Pernambuco quando o texto nao informa uma
+localizacao e ordena os resultados pela correspondencia do endereco, cidade/UF
+e proximidade da base. Informe a cidade quando a visita for fora do municipio da
+base.
+
+## Planejamento diario
+
+Um tecnico pode ter varias rotas na mesma data. Ao selecionar o tecnico, o
+supervisor ve cards com as datas, clientes, duracoes e distancia calculada. A
+consulta por data filtra esses cards; o mapa e os controles detalhados so sao
+carregados quando uma rota e aberta. Excluir uma rota tambem remove suas paradas.
+
+## Conclusao e reagendamento de visitas
+
+- Ao concluir uma visita, o tecnico registra um breve relato do atendimento.
+- Ao marcar uma visita como nao realizada, o motivo e a nova data sao obrigatorios.
+- O sistema copia somente a visita nao realizada para uma rota automatica chamada
+  `Reagendamentos`, do mesmo tecnico e da nova data.
+- A visita original fica vinculada a nova visita; o banco impede criar dois
+  reagendamentos para a mesma origem.
+- A rota automatica fica como rascunho para o ADM/Supervisor revisar, otimizar e
+  publicar.
+- O painel identifica tanto a visita transferida quanto a nova rota recebida por
+  reagendamento.
+- Rotas e paradas com historico de reagendamento nao podem ser excluidas, para
+  preservar o vinculo e impedir uma nova copia acidental da mesma visita.
+
 ## Perfis
 
 - `supervisor`: gerencia tecnicos, usuarios, empresa, paradas e publicacao;

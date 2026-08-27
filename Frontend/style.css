@@ -85,9 +85,19 @@ textarea:focus-visible,
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 10px 8px 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   margin-bottom: 18px;
+}
+
+.brand-logo {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .brand strong {

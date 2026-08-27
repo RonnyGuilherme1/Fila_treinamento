@@ -35,9 +35,12 @@
 }
 
 .tv-header-brand {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
+
+.tv-header-brand img { width: 52px; height: 52px; object-fit: contain; }
 
 .tv-header span {
   color: var(--primary);

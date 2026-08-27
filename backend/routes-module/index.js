@@ -100,7 +100,20 @@ async function getPlan(pool, planId, user, { lock = false } = {}) {
 async function getPlanDetails(pool, planId, user) {
   const plan = await getPlan(pool, planId, user);
   const stops = await pool.query(
-    "SELECT * FROM rotas_paradas WHERE plano_id = $1 ORDER BY ordem, id",
+     `SELECT rp.*,
+            origem_plano.data AS reagendada_de_data,
+            origem.motivo_status AS reagendada_de_motivo,
+            destino.id AS parada_reagendada_id,
+            destino.plano_id AS plano_reagendado_id,
+            destino_plano.titulo AS plano_reagendado_titulo,
+            destino_plano.data AS plano_reagendado_data
+     FROM rotas_paradas rp
+     LEFT JOIN rotas_paradas origem ON origem.id = rp.reagendada_de_id
+     LEFT JOIN rotas_planos origem_plano ON origem_plano.id = origem.plano_id
+     LEFT JOIN rotas_paradas destino ON destino.reagendada_de_id = rp.id
+     LEFT JOIN rotas_planos destino_plano ON destino_plano.id = destino.plano_id
+     WHERE rp.plano_id = $1
+     ORDER BY rp.ordem, rp.id`,
     [planId],
   );
   return { ...plan, paradas: stops.rows };
@@ -303,8 +316,10 @@ function createRoutesRouter(pool) {
     }
     const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
     const result = await pool.query(
-      `SELECT p.*, t.nome AS tecnico_nome,
+       `SELECT p.*, t.nome AS tecnico_nome,
               COUNT(rp.id)::int AS total_paradas,
+              (COUNT(rp.id) FILTER (WHERE rp.reagendada_para IS NOT NULL))::int AS total_reagendadas,
+              (COUNT(rp.id) FILTER (WHERE rp.reagendada_de_id IS NOT NULL))::int AS total_recebidas_reagendamento,
               COALESCE(SUM(rp.duracao_atendimento_min), 0)::int AS duracao_clientes_min,
               COALESCE(
                 JSONB_AGG(
@@ -314,9 +329,12 @@ function createRoutesRouter(pool) {
                     'cliente', rp.cliente,
                     'endereco', rp.endereco,
                     'duracao_atendimento_min', rp.duracao_atendimento_min,
-                    'horario_inicio', rp.horario_inicio,
-                    'horario_fim', rp.horario_fim,
-                    'status', rp.status
+                     'horario_inicio', rp.horario_inicio,
+                     'horario_fim', rp.horario_fim,
+                     'status', rp.status,
+                     'motivo_status', rp.motivo_status,
+                     'reagendada_para', rp.reagendada_para,
+                     'reagendada_de_id', rp.reagendada_de_id
                   ) ORDER BY rp.ordem, rp.id
                 ) FILTER (WHERE rp.id IS NOT NULL),
                 '[]'::jsonb
@@ -392,6 +410,19 @@ function createRoutesRouter(pool) {
   router.delete("/planos/:id", auth.requireSupervisor, auth.requireCsrf, asyncRoute(async (req, res) => {
     const id = positiveId(req.params.id);
     await getPlan(pool, id, req.routeUser);
+    const reschedules = await pool.query(
+      `SELECT EXISTS (
+         SELECT 1 FROM rotas_paradas rp
+         WHERE rp.plano_id = $1
+           AND (rp.reagendada_de_id IS NOT NULL OR EXISTS (
+             SELECT 1 FROM rotas_paradas destino WHERE destino.reagendada_de_id = rp.id
+           ))
+       ) AS possui`,
+      [id],
+    );
+    if (reschedules.rows[0].possui) {
+      throw httpError("Esta rota possui historico de reagendamento e nao pode ser excluida.", 409);
+    }
     await pool.query("DELETE FROM rotas_planos WHERE id = $1", [id]);
     res.status(204).end();
   }));
@@ -453,6 +484,19 @@ function createRoutesRouter(pool) {
     const planId = positiveId(req.params.planId);
     const stopId = positiveId(req.params.stopId);
     await getPlan(pool, planId, req.routeUser);
+    const reschedules = await pool.query(
+      `SELECT EXISTS (
+         SELECT 1 FROM rotas_paradas rp
+         WHERE rp.id = $1 AND rp.plano_id = $2
+           AND (rp.reagendada_de_id IS NOT NULL OR EXISTS (
+             SELECT 1 FROM rotas_paradas destino WHERE destino.reagendada_de_id = rp.id
+           ))
+       ) AS possui`,
+      [stopId, planId],
+    );
+    if (reschedules.rows[0].possui) {
+      throw httpError("Esta parada possui historico de reagendamento e nao pode ser excluida.", 409);
+    }
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -538,23 +582,108 @@ function createRoutesRouter(pool) {
   router.patch("/planos/:planId/paradas/:stopId/status", auth.requireCsrf, asyncRoute(async (req, res) => {
     const planId = positiveId(req.params.planId);
     const stopId = positiveId(req.params.stopId);
-    await getPlan(pool, planId, req.routeUser);
     const status = req.body?.status;
     if (!['pendente', 'em_atendimento', 'concluida', 'nao_realizada'].includes(status)) throw httpError("Status invalido.");
-    const result = await pool.query(
-      `UPDATE rotas_paradas SET status = $1, atualizado_em = NOW()
-       WHERE id = $2 AND plano_id = $3 RETURNING *`,
-      [status, stopId, planId],
-    );
-    if (!result.rows.length) throw httpError("Parada nao encontrada.", 404);
-    const pending = await pool.query(
-      "SELECT COUNT(*)::int AS total FROM rotas_paradas WHERE plano_id = $1 AND status NOT IN ('concluida', 'nao_realizada')",
-      [planId],
-    );
-    if (pending.rows[0].total === 0) {
-      await pool.query("UPDATE rotas_planos SET status = 'concluida', atualizado_em = NOW() WHERE id = $1 AND status = 'publicada'", [planId]);
+    const plan = await getPlan(pool, planId, req.routeUser);
+    if (plan.status === 'concluida') throw httpError("Esta rota ja foi concluida e nao aceita novas alteracoes.", 409);
+    const motive = ['concluida', 'nao_realizada'].includes(status)
+      ? requiredText(req.body?.motivo, status === 'concluida' ? "uma observacao da conclusao" : "o motivo da nao realizacao", 500)
+      : null;
+    const rescheduleDate = status === 'nao_realizada'
+      ? validDate(req.body?.reagendarPara, "a nova data")
+      : null;
+    const planDate = plan.data instanceof Date ? plan.data.toISOString().slice(0, 10) : String(plan.data).slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    if (rescheduleDate && (rescheduleDate <= planDate || rescheduleDate < today)) {
+      throw httpError("A nova data deve ser futura em relacao a rota e nao pode estar no passado.");
     }
-    res.json(result.rows[0]);
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const sourceResult = await client.query(
+        "SELECT * FROM rotas_paradas WHERE id = $1 AND plano_id = $2 FOR UPDATE",
+        [stopId, planId],
+      );
+      if (!sourceResult.rows.length) throw httpError("Parada nao encontrada.", 404);
+      const source = sourceResult.rows[0];
+      const existingReschedule = await client.query(
+        `SELECT rp.id, rp.plano_id, p.data, p.titulo
+         FROM rotas_paradas rp
+         JOIN rotas_planos p ON p.id = rp.plano_id
+         WHERE rp.reagendada_de_id = $1`,
+        [stopId],
+      );
+      if (existingReschedule.rows.length) {
+        throw httpError(`Esta visita ja foi reagendada para ${String(existingReschedule.rows[0].data).slice(0, 10)}.`, 409);
+      }
+
+      let rescheduled = null;
+      if (status === 'nao_realizada') {
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`rotas-reagendamento:${plan.tecnico_id}:${rescheduleDate}`]);
+        let targetResult = await client.query(
+          `SELECT * FROM rotas_planos
+           WHERE tecnico_id = $1 AND data = $2 AND status = 'rascunho' AND titulo = 'Reagendamentos'
+           ORDER BY criado_em DESC LIMIT 1 FOR UPDATE`,
+          [plan.tecnico_id, rescheduleDate],
+        );
+        if (!targetResult.rows.length) {
+          targetResult = await client.query(
+            `INSERT INTO rotas_planos
+             (tecnico_id, data, titulo, retornar_empresa, origem_nome, origem_endereco,
+              origem_latitude, origem_longitude, criado_por)
+             VALUES ($1, $2, 'Reagendamentos', TRUE, $3, $4, $5, $6, $7)
+             RETURNING *`,
+            [plan.tecnico_id, rescheduleDate, plan.origem_nome, plan.origem_endereco,
+              plan.origem_latitude, plan.origem_longitude, req.routeUser.id],
+          );
+        }
+        const target = targetResult.rows[0];
+        const orderResult = await client.query(
+          "SELECT COALESCE(MAX(ordem), 0)::int + 1 AS proxima FROM rotas_paradas WHERE plano_id = $1",
+          [target.id],
+        );
+        const inserted = await client.query(
+          `INSERT INTO rotas_paradas
+           (plano_id, ordem, cliente, endereco, latitude, longitude,
+            duracao_atendimento_min, horario_inicio, horario_fim, observacoes,
+            status, reagendada_de_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pendente', $11)
+           RETURNING *`,
+          [target.id, orderResult.rows[0].proxima, source.cliente, source.endereco,
+            source.latitude, source.longitude, source.duracao_atendimento_min,
+            source.horario_inicio, source.horario_fim, source.observacoes, stopId],
+        );
+        rescheduled = {
+          planoId: target.id,
+          paradaId: inserted.rows[0].id,
+          titulo: target.titulo,
+          data: rescheduleDate,
+        };
+      }
+
+      const updatedResult = await client.query(
+        `UPDATE rotas_paradas
+         SET status = $1, motivo_status = $2, reagendada_para = $3, atualizado_em = NOW()
+         WHERE id = $4 AND plano_id = $5
+         RETURNING *`,
+        [status, motive, rescheduleDate, stopId, planId],
+      );
+      const pending = await client.query(
+        "SELECT COUNT(*)::int AS total FROM rotas_paradas WHERE plano_id = $1 AND status NOT IN ('concluida', 'nao_realizada')",
+        [planId],
+      );
+      if (pending.rows[0].total === 0) {
+        await client.query("UPDATE rotas_planos SET status = 'concluida', atualizado_em = NOW() WHERE id = $1 AND status = 'publicada'", [planId]);
+      }
+      await client.query("COMMIT");
+      res.json({ parada: updatedResult.rows[0], reagendamento: rescheduled });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw translateDatabaseError(error);
+    } finally {
+      client.release();
+    }
   }));
 
   router.use((error, _req, res, _next) => {

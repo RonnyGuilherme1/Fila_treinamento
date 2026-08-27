@@ -7,16 +7,16 @@
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.de https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <title>Conecta - Rotas externas</title>
-    <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+    <link rel="icon" href="/favicon.ico?v=3" type="image/x-icon" />
     <link rel="stylesheet" href="/vendor/leaflet/leaflet.css?v=1.9.4" />
-    <link rel="stylesheet" href="rotas.css?v=1.1.0" />
+    <link rel="stylesheet" href="rotas.css?v=1.1.1" />
   </head>
   <body>
     <div id="globalLoading" class="global-loading hidden" aria-label="Carregando"><span></span></div>
     <div id="loginView" class="auth-shell">
       <section class="auth-card">
         <a class="back-link" href="../index.html">← Voltar ao sistema</a>
-        <div class="auth-brand"><span>C</span></div>
+        <div class="auth-brand"><img src="/conectapc-logo.png?v=1" alt="Conecta" /></div>
         <p class="eyebrow">Área protegida</p>
         <h1>Rotas externas</h1>
         <p class="auth-copy">Entre como ADM/Supervisor ou técnico para continuar.</p>
@@ -47,7 +47,7 @@
 
     <div id="appView" class="app-shell hidden">
       <aside class="sidebar">
-        <div class="brand"><strong>Conecta</strong><span>Rotas externas</span></div>
+        <div class="brand"><img src="/conectapc-logo.png?v=1" alt="" /><div><strong>Conecta</strong><span>Rotas externas</span></div></div>
         <nav id="moduleNav">
           <button type="button" class="nav-item active" data-panel="planejamento">Planejamento</button>
           <button type="button" class="nav-item supervisor-only" data-panel="tecnicos">Técnicos</button>
@@ -188,8 +188,30 @@
       </main>
     </div>
 
+    <div id="stopStatusModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="stopStatusModalTitle">
+      <section class="modal-card">
+        <form id="stopStatusForm">
+          <input id="statusStopId" type="hidden" />
+          <input id="statusValue" type="hidden" />
+          <p class="eyebrow">Registro do atendimento</p>
+          <h2 id="stopStatusModalTitle">Finalizar visita</h2>
+          <p id="stopStatusModalCopy" class="modal-copy"></p>
+          <label id="statusReasonLabel">Observação
+            <textarea id="statusReason" maxlength="500" required placeholder="Descreva o que aconteceu no atendimento."></textarea>
+          </label>
+          <label id="rescheduleDateLabel" class="hidden">Reagendar para
+            <input id="rescheduleDate" type="date" />
+          </label>
+          <div class="modal-actions">
+            <button id="cancelStopStatusButton" type="button" class="ghost-button">Cancelar</button>
+            <button id="confirmStopStatusButton" type="submit">Confirmar</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
     <div id="toastRegion" class="toast-region" aria-live="polite"></div>
     <script src="/vendor/leaflet/leaflet.js?v=1.9.4"></script>
-    <script src="rotas.js?v=1.1.0"></script>
+    <script src="rotas.js?v=1.1.1"></script>
   </body>
 </html>

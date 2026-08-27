@@ -102,6 +102,9 @@ DROP CONSTRAINT IF EXISTS rotas_planos_tecnico_id_data_key;
 CREATE INDEX IF NOT EXISTS idx_rotas_planos_data
 ON rotas_planos (data, tecnico_id);
 
+CREATE INDEX IF NOT EXISTS idx_rotas_planos_tecnico_data
+ON rotas_planos (tecnico_id, data DESC, criado_em DESC);
+
 UPDATE rotas_planos
 SET retornar_empresa = TRUE
 WHERE retornar_empresa IS DISTINCT FROM TRUE;
@@ -131,3 +134,25 @@ CREATE TABLE IF NOT EXISTS rotas_paradas (
 
 CREATE INDEX IF NOT EXISTS idx_rotas_paradas_plano
 ON rotas_paradas (plano_id, ordem);
+
+ALTER TABLE rotas_paradas
+ADD COLUMN IF NOT EXISTS motivo_status TEXT;
+
+ALTER TABLE rotas_paradas
+ADD COLUMN IF NOT EXISTS reagendada_para DATE;
+
+ALTER TABLE rotas_paradas
+ADD COLUMN IF NOT EXISTS reagendada_de_id INTEGER;
+
+DO $$
+BEGIN
+  ALTER TABLE rotas_paradas
+  ADD CONSTRAINT rotas_paradas_reagendada_de_fk
+  FOREIGN KEY (reagendada_de_id) REFERENCES rotas_paradas(id) ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rotas_paradas_reagendada_de_unica
+ON rotas_paradas (reagendada_de_id)
+WHERE reagendada_de_id IS NOT NULL;

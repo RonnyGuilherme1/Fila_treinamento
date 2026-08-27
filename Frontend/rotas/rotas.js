@@ -21,6 +21,7 @@ const state = {
 
 let activeRequests = 0;
 let loadingTimer = null;
+let planLoadSequence = 0;
 
 function element(id) { return document.getElementById(id); }
 function show(id, visible = true) { element(id)?.classList.toggle("hidden", !visible); }
@@ -443,7 +444,7 @@ async function saveCompany(event) {
       toast("Marque o ponto real da base no mapa antes de salvar.", "error");
       return;
     }
-    await request("/configuracao", { method: "PATCH", body: JSON.stringify({
+    state.companyConfig = await request("/configuracao", { method: "PATCH", body: JSON.stringify({
       empresaNome: element("companyName").value,
       empresaEndereco: element("companyAddress").value,
       empresaLatitude: latitude,
@@ -493,13 +494,19 @@ function renderPlanCards() {
   const container = element("routeCards");
   container.innerHTML = state.plans.map((plan) => {
     const stops = Array.isArray(plan.paradas) ? plan.paradas : [];
-    const destinations = stops.slice(0, 4).map((stop) => `
-      <li><span>${escapeHTML(stop.cliente)} — ${escapeHTML(stop.endereco)}</span><strong>${Number(stop.duracao_atendimento_min || 0)} min</strong></li>`).join("");
+    const destinations = stops.slice(0, 4).map((stop) => {
+      const rescheduleBadge = stop.reagendada_de_id
+        ? '<small class="reschedule-badge">Reagendada</small>'
+        : stop.reagendada_para
+          ? `<small class="reschedule-badge">Transferida para ${formatDate(stop.reagendada_para)}</small>`
+          : "";
+      return `<li><span>${escapeHTML(stop.cliente)} — ${escapeHTML(stop.endereco)} ${rescheduleBadge}</span><strong>${Number(stop.duracao_atendimento_min || 0)} min</strong></li>`;
+    }).join("");
     const remaining = stops.length > 4 ? `<li><span>+ ${stops.length - 4} cliente(s)</span><strong>ver detalhes</strong></li>` : "";
     const deleteButton = state.user.perfil === "supervisor"
       ? `<button type="button" class="danger-button delete-card-button" data-action="delete-plan" data-id="${plan.id}" title="Excluir rota">Excluir</button>` : "";
     return `<article class="route-card">
-      <div class="route-card-header"><div><p class="eyebrow">${formatDate(plan.data)}</p><h3>${escapeHTML(plan.titulo || `Rota #${plan.id}`)}</h3><p>${escapeHTML(plan.tecnico_nome)}</p></div><span class="status-pill">${statusLabel(plan.status)}</span></div>
+      <div class="route-card-header"><div><p class="eyebrow">${formatDate(plan.data)}</p><h3>${escapeHTML(plan.titulo || `Rota #${plan.id}`)}</h3><p>${escapeHTML(plan.tecnico_nome)}</p>${Number(plan.total_recebidas_reagendamento || 0) ? `<small class="reschedule-badge">${Number(plan.total_recebidas_reagendamento)} reagendada(s) recebida(s)</small>` : ""}</div><span class="status-pill">${statusLabel(plan.status)}</span></div>
       <div class="route-card-metrics">
         <div><span>Paradas</span><strong>${Number(plan.total_paradas || 0)}</strong></div>
         <div><span>Distância</span><strong>${formatDistance(plan.distancia_metros)}</strong></div>
@@ -535,9 +542,12 @@ async function loadPlans(options = {}) {
   if (!allDates) query.set("data", date);
   if (technicianId) query.set("tecnicoId", technicianId);
   const button = element("loadRoutesButton");
+  const loadSequence = ++planLoadSequence;
   setBusy(button, true, "Consultando...");
   try {
-    state.plans = await request(`/planos?${query}`);
+    const plans = await request(`/planos?${query}`);
+    if (loadSequence !== planLoadSequence) return;
+    state.plans = plans;
     state.lastPlanQuery = { allDates, date, technicianId };
     if (!state.plans.length) {
       state.plan = null;
@@ -550,7 +560,11 @@ async function loadPlans(options = {}) {
       return;
     }
     showPlanDashboard();
-  } catch (error) { toast(error.message, "error"); } finally { setBusy(button, false); }
+  } catch (error) {
+    if (loadSequence === planLoadSequence) toast(error.message, "error");
+  } finally {
+    if (loadSequence === planLoadSequence) setBusy(button, false);
+  }
 }
 
 async function createPlan() {
@@ -657,13 +671,29 @@ function renderStops() {
       <button class="secondary-button" data-action="move-stop" data-id="${stop.id}" data-direction="1" ${index === stops.length - 1 ? "disabled" : ""}>↓</button>
       <button class="secondary-button" data-action="edit-stop" data-id="${stop.id}">Editar</button>
       <button class="danger-button" data-action="remove-stop" data-id="${stop.id}">Excluir</button>` : "";
-    const statusActions = state.plan.status === "publicada" && stop.status !== "concluida" ? `
+    const statusActions = state.plan.status === "publicada" && !["concluida", "nao_realizada"].includes(stop.status) ? `
       <button class="secondary-button" data-action="update-stop-status" data-id="${stop.id}" data-status="em_atendimento">Iniciar</button>
-      <button data-action="update-stop-status" data-id="${stop.id}" data-status="concluida">Concluir</button>
-      <button class="danger-button" data-action="update-stop-status" data-id="${stop.id}" data-status="nao_realizada">Não realizada</button>` : "";
+      <button data-action="open-stop-status" data-id="${stop.id}" data-status="concluida">Concluir</button>
+      <button class="danger-button" data-action="open-stop-status" data-id="${stop.id}" data-status="nao_realizada">Não realizada</button>` : "";
+    const reason = stop.motivo_status
+      ? `<div class="stop-reason"><strong>${stop.status === "concluida" ? "Relato da conclusão" : "Motivo"}:</strong> ${escapeHTML(stop.motivo_status)}</div>`
+      : "";
+    let rescheduleInfo = "";
+    if (stop.reagendada_para) {
+      const target = stop.plano_reagendado_titulo
+        ? ` na rota “${escapeHTML(stop.plano_reagendado_titulo)}”`
+        : "";
+      rescheduleInfo = `<div class="reschedule-info">Reagendada para ${formatDate(stop.reagendada_para)}${target}. A nova visita aguarda revisão e publicação do ADM.</div>`;
+    } else if (stop.reagendada_de_id) {
+      const sourceReason = stop.reagendada_de_motivo
+        ? ` Motivo informado: ${escapeHTML(stop.reagendada_de_motivo)}.`
+        : "";
+      rescheduleInfo = `<div class="reschedule-info">Visita reagendada${stop.reagendada_de_data ? ` da rota de ${formatDate(stop.reagendada_de_data)}` : ""}.${sourceReason} Revise, otimize e publique para o técnico.</div>`;
+    }
     return `<article class="stop-card ${stop.status === "concluida" ? "done" : ""}">
       <div class="stop-head"><span class="stop-number">${index + 1}</span><div><h3>${escapeHTML(stop.cliente)}</h3><p>${escapeHTML(stop.endereco)}</p></div></div>
       <div class="stop-meta"><span>${time}</span><span>${stop.duracao_atendimento_min} min</span><span>${stopStatusLabel(stop.status)}</span></div>
+      ${reason}${rescheduleInfo}
       <div class="stop-actions"><a href="${googleNavigationUrl(stop)}" target="_blank" rel="noopener">Navegar</a>${supervisorActions}${statusActions}</div>
     </article>`;
   }).join("");
@@ -809,14 +839,87 @@ async function publishPlan() {
 
 async function updateStopStatus(id, status) {
   try {
-    const updatedStop = await request(`/planos/${state.plan.id}/paradas/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
-    state.plan.paradas = state.plan.paradas.map((stop) => stop.id === id ? updatedStop : stop);
+    const response = await request(`/planos/${state.plan.id}/paradas/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+    const updatedStop = response.parada || response;
+    state.plan.paradas = state.plan.paradas.map((stop) => stop.id === id ? { ...stop, ...updatedStop } : stop);
     if (state.plan.paradas.every((stop) => ["concluida", "nao_realizada"].includes(stop.status))) {
       state.plan.status = "concluida";
     }
     renderPlan();
     toast("Status atualizado.");
   } catch (error) { toast(error.message, "error"); }
+}
+
+function nextDateAfter(value) {
+  const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  date.setDate(date.getDate() + 1);
+  return localDateValue(date);
+}
+
+function openStopStatusModal(id, status) {
+  const stop = state.plan?.paradas.find((item) => item.id === id);
+  if (!stop || !['concluida', 'nao_realizada'].includes(status)) return;
+  element("stopStatusForm").reset();
+  element("statusStopId").value = id;
+  element("statusValue").value = status;
+  const isReschedule = status === "nao_realizada";
+  element("stopStatusModalTitle").textContent = isReschedule ? "Não realizada e reagendar" : "Concluir visita";
+  element("stopStatusModalCopy").textContent = isReschedule
+    ? `${stop.cliente}: informe o motivo e a nova data combinada com o cliente.`
+    : `${stop.cliente}: registre um breve relato do atendimento concluído.`;
+  element("statusReasonLabel").firstChild.textContent = isReschedule ? "Motivo da não realização " : "Relato da conclusão ";
+  element("statusReason").placeholder = isReschedule
+    ? "Ex.: cliente pediu para alterar a data do atendimento."
+    : "Ex.: serviço concluído e validado pelo cliente.";
+  show("rescheduleDateLabel", isReschedule);
+  element("rescheduleDate").required = isReschedule;
+  const minimumDate = [nextDateAfter(state.plan.data), localDateValue()].sort().at(-1);
+  element("rescheduleDate").min = minimumDate;
+  element("rescheduleDate").value = isReschedule ? minimumDate : "";
+  show("stopStatusModal", true);
+  setTimeout(() => element("statusReason").focus(), 0);
+}
+
+function closeStopStatusModal() {
+  show("stopStatusModal", false);
+  element("stopStatusForm").reset();
+}
+
+async function submitStopStatus(event) {
+  event.preventDefault();
+  const id = Number(element("statusStopId").value);
+  const status = element("statusValue").value;
+  const button = element("confirmStopStatusButton");
+  const payload = { status, motivo: element("statusReason").value };
+  if (status === "nao_realizada") payload.reagendarPara = element("rescheduleDate").value;
+  setBusy(button, true, status === "nao_realizada" ? "Reagendando..." : "Concluindo...");
+  try {
+    const response = await request(`/planos/${state.plan.id}/paradas/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    const previousStop = state.plan.paradas.find((stop) => stop.id === id) || {};
+    const updatedStop = {
+      ...previousStop,
+      ...response.parada,
+      plano_reagendado_id: response.reagendamento?.planoId || null,
+      plano_reagendado_titulo: response.reagendamento?.titulo || null,
+      plano_reagendado_data: response.reagendamento?.data || null,
+    };
+    state.plan.paradas = state.plan.paradas.map((stop) => stop.id === id ? updatedStop : stop);
+    if (state.plan.paradas.every((stop) => ["concluida", "nao_realizada"].includes(stop.status))) {
+      state.plan.status = "concluida";
+    }
+    closeStopStatusModal();
+    renderPlan();
+    toast(response.reagendamento
+      ? `Visita reagendada para ${formatDate(response.reagendamento.data)}. O ADM já pode revisar e publicar a nova rota.`
+      : "Visita concluída com o relato registrado.");
+  } catch (error) {
+    toast(error.message, "error");
+  } finally {
+    setBusy(button, false);
+  }
 }
 
 function handleDelegatedAction(event) {
@@ -833,6 +936,7 @@ function handleDelegatedAction(event) {
     "edit-stop": () => editStop(id),
     "remove-stop": () => removeStop(id),
     "update-stop-status": () => updateStopStatus(id, button.dataset.status),
+    "open-stop-status": () => openStopStatusModal(id, button.dataset.status),
   };
   actions[button.dataset.action]?.();
 }
@@ -849,6 +953,8 @@ function bindEvents() {
   element("routeTechnician").addEventListener("change", () => {
     if (element("routeTechnician").value) loadPlans({ allDates: true });
     else {
+      planLoadSequence += 1;
+      setBusy(element("loadRoutesButton"), false);
       state.plans = [];
       show("routesDashboard", false);
       show("routeWorkspace", false);
@@ -864,6 +970,11 @@ function bindEvents() {
   element("stopForm").addEventListener("submit", saveStop);
   element("optimizeButton").addEventListener("click", optimizePlan);
   element("publishButton").addEventListener("click", publishPlan);
+  element("stopStatusForm").addEventListener("submit", submitStopStatus);
+  element("cancelStopStatusButton").addEventListener("click", closeStopStatusModal);
+  element("stopStatusModal").addEventListener("click", (event) => {
+    if (event.target === element("stopStatusModal")) closeStopStatusModal();
+  });
   element("technicianForm").addEventListener("submit", createTechnician);
   element("userForm").addEventListener("submit", createUser);
   element("newUserRole").addEventListener("change", updateUserRoleForm);
