@@ -4,12 +4,30 @@ const compression = require("compression");
 const path = require("path");
 const ExcelJS = require("exceljs");
 const pool = require("./db");
+const { createRoutesRouter, initializeRoutesModule } = require("./routes-module");
 
 const app = express();
 
+app.set("trust proxy", 1);
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
 app.use(compression());
 app.use(express.json({ limit: "100kb" }));
+app.use((req, res, next) => {
+  if (req.path.startsWith("/rotas/") || req.path.startsWith("/api/rotas")) {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com 'unsafe-inline'; img-src 'self' data: https://unpkg.com https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    );
+    if (process.env.NODE_ENV === "production") {
+      res.setHeader("Strict-Transport-Security", "max-age=31536000");
+    }
+  }
+  next();
+});
 
 app.use(
   express.static(path.join(__dirname, "../Frontend"), {
@@ -1066,10 +1084,19 @@ app.get(
   }),
 );
 
+app.use("/api/rotas", createRoutesRouter(pool));
+
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(err.status || 500).json({ erro: err.message || "Erro interno" });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("API rodando na porta " + PORT));
+initializeRoutesModule(pool)
+  .then(() => {
+    app.listen(PORT, () => console.log("API rodando na porta " + PORT));
+  })
+  .catch((err) => {
+    console.error("Falha ao inicializar o modulo de rotas:", err);
+    process.exitCode = 1;
+  });
