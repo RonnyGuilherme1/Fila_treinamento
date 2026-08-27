@@ -144,6 +144,29 @@ ADD COLUMN IF NOT EXISTS reagendada_para DATE;
 ALTER TABLE rotas_paradas
 ADD COLUMN IF NOT EXISTS reagendada_de_id INTEGER;
 
+ALTER TABLE rotas_paradas
+ADD COLUMN IF NOT EXISTS relato_conclusao TEXT;
+
+ALTER TABLE rotas_paradas
+ADD COLUMN IF NOT EXISTS reagendada_de_data DATE;
+
+ALTER TABLE rotas_paradas
+ADD COLUMN IF NOT EXISTS historico_reagendamentos JSONB;
+
+UPDATE rotas_paradas
+SET relato_conclusao = motivo_status
+WHERE status = 'concluida'
+  AND relato_conclusao IS NULL
+  AND motivo_status IS NOT NULL;
+
+UPDATE rotas_paradas
+SET historico_reagendamentos = '[]'::jsonb
+WHERE historico_reagendamentos IS NULL;
+
+ALTER TABLE rotas_paradas
+ALTER COLUMN historico_reagendamentos SET DEFAULT '[]'::jsonb,
+ALTER COLUMN historico_reagendamentos SET NOT NULL;
+
 DO $$
 BEGIN
   ALTER TABLE rotas_paradas
@@ -156,3 +179,109 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rotas_paradas_reagendada_de_unica
 ON rotas_paradas (reagendada_de_id)
 WHERE reagendada_de_id IS NOT NULL;
+
+-- Versoes anteriores copiavam a visita e deixavam duas tarefas visiveis.
+-- A migracao abaixo conserva o ID da visita original, move essa mesma linha
+-- para a nova data e remove a copia criada pelo comportamento antigo.
+DO $$
+DECLARE
+  item RECORD;
+BEGIN
+  FOR item IN
+    SELECT
+      destino.id AS destino_id,
+      destino.plano_id AS destino_plano_id,
+      destino.ordem AS destino_ordem,
+      destino.status AS destino_status,
+      destino.cliente AS destino_cliente,
+      destino.endereco AS destino_endereco,
+      destino.latitude AS destino_latitude,
+      destino.longitude AS destino_longitude,
+      destino.duracao_atendimento_min AS destino_duracao,
+      destino.horario_inicio AS destino_horario_inicio,
+      destino.horario_fim AS destino_horario_fim,
+      destino.observacoes AS destino_observacoes,
+      destino.relato_conclusao AS destino_relato_conclusao,
+      origem.id AS origem_id,
+      origem.plano_id AS origem_plano_id,
+      origem.motivo_status AS motivo,
+      plano_origem.data AS data_anterior,
+      plano_destino.data AS nova_data
+    FROM rotas_paradas destino
+    JOIN rotas_paradas origem ON origem.id = destino.reagendada_de_id
+    JOIN rotas_planos plano_origem ON plano_origem.id = origem.plano_id
+    JOIN rotas_planos plano_destino ON plano_destino.id = destino.plano_id
+    WHERE destino.reagendada_de_id IS NOT NULL
+    ORDER BY destino.plano_id, destino.ordem, destino.id
+  LOOP
+    DELETE FROM rotas_paradas WHERE id = item.destino_id;
+
+    UPDATE rotas_paradas
+    SET plano_id = item.destino_plano_id,
+        ordem = item.destino_ordem,
+        status = COALESCE(item.destino_status, 'pendente'),
+        cliente = item.destino_cliente,
+        endereco = item.destino_endereco,
+        latitude = item.destino_latitude,
+        longitude = item.destino_longitude,
+        duracao_atendimento_min = item.destino_duracao,
+        horario_inicio = item.destino_horario_inicio,
+        horario_fim = item.destino_horario_fim,
+        observacoes = item.destino_observacoes,
+        relato_conclusao = item.destino_relato_conclusao,
+        reagendada_de_id = NULL,
+        reagendada_de_data = item.data_anterior,
+        reagendada_para = item.nova_data,
+        historico_reagendamentos = COALESCE(historico_reagendamentos, '[]'::jsonb)
+          || JSONB_BUILD_ARRAY(JSONB_BUILD_OBJECT(
+            'dataAnterior', item.data_anterior,
+            'novaData', item.nova_data,
+            'motivo', item.motivo,
+            'migradoEm', NOW()
+          )),
+        atualizado_em = NOW()
+    WHERE id = item.origem_id;
+
+    WITH ordenadas AS (
+      SELECT id, ROW_NUMBER() OVER (ORDER BY ordem, id)::int AS nova_ordem
+      FROM rotas_paradas
+      WHERE plano_id = item.origem_plano_id
+    )
+    UPDATE rotas_paradas parada
+    SET ordem = ordenadas.nova_ordem
+    FROM ordenadas
+    WHERE parada.id = ordenadas.id;
+
+    DELETE FROM rotas_planos plano
+    WHERE plano.id = item.origem_plano_id
+      AND NOT EXISTS (SELECT 1 FROM rotas_paradas WHERE plano_id = plano.id);
+
+    UPDATE rotas_planos plano
+    SET status = CASE
+          WHEN NOT EXISTS (
+            SELECT 1 FROM rotas_paradas parada
+            WHERE parada.plano_id = plano.id
+              AND parada.status NOT IN ('concluida', 'nao_realizada')
+          ) THEN 'concluida'
+          ELSE plano.status
+        END,
+        distancia_metros = NULL,
+        duracao_segundos = NULL,
+        geometria = NULL,
+        provedor_rota = NULL,
+        aviso_calculo = 'Rota alterada por reagendamento. O ADM pode otimizar novamente.',
+        calculada_em = NULL,
+        atualizado_em = NOW()
+    WHERE plano.id = item.origem_plano_id;
+
+    UPDATE rotas_planos
+    SET distancia_metros = NULL,
+        duracao_segundos = NULL,
+        geometria = NULL,
+        provedor_rota = NULL,
+        aviso_calculo = 'Rota alterada por reagendamento. O ADM pode otimizar novamente.',
+        calculada_em = NULL,
+        atualizado_em = NOW()
+    WHERE id = item.destino_plano_id;
+  END LOOP;
+END $$;

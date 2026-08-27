@@ -495,8 +495,8 @@ function renderPlanCards() {
   container.innerHTML = state.plans.map((plan) => {
     const stops = Array.isArray(plan.paradas) ? plan.paradas : [];
     const destinations = stops.slice(0, 4).map((stop) => {
-      const rescheduleBadge = stop.reagendada_de_id
-        ? '<small class="reschedule-badge">Reagendada</small>'
+      const rescheduleBadge = stop.reagendada_de_data
+        ? `<small class="reschedule-badge">Reagendada de ${formatDate(stop.reagendada_de_data)}</small>`
         : stop.reagendada_para
           ? `<small class="reschedule-badge">Transferida para ${formatDate(stop.reagendada_para)}</small>`
           : "";
@@ -676,24 +676,26 @@ function renderStops() {
       <button data-action="open-stop-status" data-id="${stop.id}" data-status="concluida">Concluir</button>
       <button class="danger-button" data-action="open-stop-status" data-id="${stop.id}" data-status="nao_realizada">Não realizada</button>` : "";
     const reason = stop.motivo_status
-      ? `<div class="stop-reason"><strong>${stop.status === "concluida" ? "Relato da conclusão" : "Motivo"}:</strong> ${escapeHTML(stop.motivo_status)}</div>`
+      ? `<div class="stop-reason"><strong>Motivo da tentativa não realizada:</strong> ${escapeHTML(stop.motivo_status)}</div>`
+      : "";
+    const completionReport = stop.relato_conclusao
+      ? `<div class="stop-reason"><strong>Relato da conclusão:</strong> ${escapeHTML(stop.relato_conclusao)}</div>`
       : "";
     let rescheduleInfo = "";
-    if (stop.reagendada_para) {
-      const target = stop.plano_reagendado_titulo
-        ? ` na rota “${escapeHTML(stop.plano_reagendado_titulo)}”`
-        : "";
-      rescheduleInfo = `<div class="reschedule-info">Reagendada para ${formatDate(stop.reagendada_para)}${target}. A nova visita aguarda revisão e publicação do ADM.</div>`;
+    if (stop.reagendada_de_data) {
+      rescheduleInfo = `<div class="reschedule-info">Esta mesma visita foi reagendada de ${formatDate(stop.reagendada_de_data)} para ${formatDate(stop.reagendada_para || state.plan.data)}. Ela aguarda revisão e publicação do ADM.</div>`;
     } else if (stop.reagendada_de_id) {
       const sourceReason = stop.reagendada_de_motivo
         ? ` Motivo informado: ${escapeHTML(stop.reagendada_de_motivo)}.`
         : "";
       rescheduleInfo = `<div class="reschedule-info">Visita reagendada${stop.reagendada_de_data ? ` da rota de ${formatDate(stop.reagendada_de_data)}` : ""}.${sourceReason} Revise, otimize e publique para o técnico.</div>`;
+    } else if (stop.reagendada_para) {
+      rescheduleInfo = `<div class="reschedule-info">Reagendada para ${formatDate(stop.reagendada_para)}. A visita aguarda revisão e publicação do ADM.</div>`;
     }
     return `<article class="stop-card ${stop.status === "concluida" ? "done" : ""}">
       <div class="stop-head"><span class="stop-number">${index + 1}</span><div><h3>${escapeHTML(stop.cliente)}</h3><p>${escapeHTML(stop.endereco)}</p></div></div>
       <div class="stop-meta"><span>${time}</span><span>${stop.duracao_atendimento_min} min</span><span>${stopStatusLabel(stop.status)}</span></div>
-      ${reason}${rescheduleInfo}
+      ${reason}${completionReport}${rescheduleInfo}
       <div class="stop-actions"><a href="${googleNavigationUrl(stop)}" target="_blank" rel="noopener">Navegar</a>${supervisorActions}${statusActions}</div>
     </article>`;
   }).join("");
@@ -898,23 +900,22 @@ async function submitStopStatus(event) {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
+    closeStopStatusModal();
+    if (response.reagendamento) {
+      state.plan = null;
+      await loadPlans({ allDates: true });
+      toast(`A mesma visita foi movida para ${formatDate(response.reagendamento.data)}, mantendo o motivo e o histórico. O ADM já pode revisar e publicar a rota.`);
+      return;
+    }
     const previousStop = state.plan.paradas.find((stop) => stop.id === id) || {};
-    const updatedStop = {
-      ...previousStop,
-      ...response.parada,
-      plano_reagendado_id: response.reagendamento?.planoId || null,
-      plano_reagendado_titulo: response.reagendamento?.titulo || null,
-      plano_reagendado_data: response.reagendamento?.data || null,
-    };
-    state.plan.paradas = state.plan.paradas.map((stop) => stop.id === id ? updatedStop : stop);
+    state.plan.paradas = state.plan.paradas.map((stop) => stop.id === id
+      ? { ...previousStop, ...response.parada }
+      : stop);
     if (state.plan.paradas.every((stop) => ["concluida", "nao_realizada"].includes(stop.status))) {
       state.plan.status = "concluida";
     }
-    closeStopStatusModal();
     renderPlan();
-    toast(response.reagendamento
-      ? `Visita reagendada para ${formatDate(response.reagendamento.data)}. O ADM já pode revisar e publicar a nova rota.`
-      : "Visita concluída com o relato registrado.");
+    toast("Visita concluída com o relato registrado.");
   } catch (error) {
     toast(error.message, "error");
   } finally {
@@ -996,3 +997,10 @@ function bindEvents() {
 bindEvents();
 updateUserRoleForm();
 checkSession();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/rotas/service-worker.js", { scope: "/rotas/" })
+      .catch((error) => console.warn("Nao foi possivel ativar o modo aplicativo:", error.message));
+  });
+}

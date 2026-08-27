@@ -43,7 +43,7 @@ app.use(
     maxAge: "1d",
     etag: true,
     setHeaders(res, filePath) {
-      if (path.extname(filePath) === ".html") {
+      if (path.extname(filePath) === ".html" || path.basename(filePath) === "service-worker.js") {
         res.setHeader("Cache-Control", "no-cache");
       }
     },
@@ -54,6 +54,11 @@ app.use(
   express.static(path.join(__dirname, "../Frontend"), {
     maxAge: "1d",
     etag: true,
+    setHeaders(res, filePath) {
+      if (path.extname(filePath) === ".webmanifest") {
+        res.setHeader("Cache-Control", "no-cache");
+      }
+    },
   }),
 );
 

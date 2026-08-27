@@ -54,16 +54,18 @@ carregados quando uma rota e aberta. Excluir uma rota tambem remove suas paradas
 
 - Ao concluir uma visita, o tecnico registra um breve relato do atendimento.
 - Ao marcar uma visita como nao realizada, o motivo e a nova data sao obrigatorios.
-- O sistema copia somente a visita nao realizada para uma rota automatica chamada
-  `Reagendamentos`, do mesmo tecnico e da nova data.
-- A visita original fica vinculada a nova visita; o banco impede criar dois
-  reagendamentos para a mesma origem.
+- O sistema move a propria visita nao realizada para uma rota automatica chamada
+  `Reagendamentos`, do mesmo tecnico e da nova data. O ID da tarefa nao muda e
+  nenhuma copia e criada.
+- O motivo e cada mudanca de data ficam gravados no historico da mesma visita.
+- Se a rota anterior ficar sem visitas, ela e removida automaticamente; se ainda
+  houver outras visitas, permanece com a sequencia atualizada.
 - A rota automatica fica como rascunho para o ADM/Supervisor revisar, otimizar e
   publicar.
-- O painel identifica tanto a visita transferida quanto a nova rota recebida por
-  reagendamento.
-- Rotas e paradas com historico de reagendamento nao podem ser excluidas, para
-  preservar o vinculo e impedir uma nova copia acidental da mesma visita.
+- O painel identifica a data anterior e mostra o motivo do reagendamento. O relato
+  de uma conclusao posterior e guardado em um campo separado.
+- Na inicializacao, o banco converte automaticamente os pares de visitas criados
+  pela versao anterior em uma unica tarefa, preservando o ID original.
 
 ## Perfis
 

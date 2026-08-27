@@ -131,17 +131,22 @@ test("schema permite varias rotas para o mesmo tecnico e data", () => {
   assert.match(sql, /titulo TEXT NOT NULL DEFAULT 'Rota'/);
 });
 
-test("schema vincula cada visita original a um unico reagendamento", () => {
+test("schema registra o historico e migra copias antigas para a mesma visita", () => {
   const sql = fs.readFileSync(path.join(__dirname, "../../database/rotas.sql"), "utf8");
   assert.match(sql, /ADD COLUMN IF NOT EXISTS motivo_status TEXT/);
   assert.match(sql, /ADD COLUMN IF NOT EXISTS reagendada_para DATE/);
   assert.match(sql, /ADD COLUMN IF NOT EXISTS reagendada_de_id INTEGER/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS relato_conclusao TEXT/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS reagendada_de_data DATE/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS historico_reagendamentos JSONB/);
+  assert.match(sql, /ALTER COLUMN historico_reagendamentos SET NOT NULL/);
   assert.match(sql, /FOREIGN KEY \(reagendada_de_id\) REFERENCES rotas_paradas\(id\) ON DELETE SET NULL/);
-  assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS idx_rotas_paradas_reagendada_de_unica/);
-  assert.match(sql, /WHERE reagendada_de_id IS NOT NULL/);
+  assert.match(sql, /JOIN rotas_paradas origem ON origem.id = destino.reagendada_de_id/);
+  assert.match(sql, /DELETE FROM rotas_paradas WHERE id = item.destino_id/);
+  assert.match(sql, /WHERE id = item.origem_id/);
 });
 
-test("nao realizada copia somente a parada e devolve o vinculo do reagendamento", async () => {
+test("nao realizada move a mesma parada e remove a rota anterior vazia", async () => {
   const queries = [];
   const planDate = isoDateOffset(1);
   const rescheduleDate = isoDateOffset(2);
@@ -160,15 +165,16 @@ test("nao realizada copia somente a parada e devolve o vinculo do reagendamento"
       queries.push(sql);
       if (sql === "BEGIN" || sql === "COMMIT" || sql.includes("pg_advisory_xact_lock")) return { rows: [] };
       if (sql.includes("FROM rotas_paradas WHERE id = $1") && sql.includes("FOR UPDATE")) return { rows: [source] };
-      if (sql.includes("WHERE rp.reagendada_de_id = $1")) return { rows: [] };
       if (sql.includes("FROM rotas_planos") && sql.includes("titulo = 'Reagendamentos'")) return { rows: [] };
       if (sql.includes("INSERT INTO rotas_planos")) return { rows: [{ ...plan, id: 30, data: rescheduleDate, status: "rascunho", titulo: "Reagendamentos" }] };
       if (sql.includes("COALESCE(MAX(ordem)")) return { rows: [{ proxima: 1 }] };
-      if (sql.includes("INSERT INTO rotas_paradas")) return { rows: [{ ...source, id: 40, plano_id: 30, reagendada_de_id: 20 }] };
-      if (sql.includes("UPDATE rotas_paradas") && sql.includes("motivo_status")) {
-        return { rows: [{ ...source, status: "nao_realizada", motivo_status: "Cliente pediu outra data", reagendada_para: rescheduleDate }] };
+      if (sql.includes("SET CONSTRAINTS")) return { rows: [] };
+      if (sql.includes("SET plano_id = $1") && sql.includes("historico_reagendamentos")) {
+        return { rows: [{ ...source, plano_id: 30, status: "pendente", motivo_status: "Cliente pediu outra data", reagendada_de_data: planDate, reagendada_para: rescheduleDate }] };
       }
-      if (sql.includes("COUNT(*)::int AS total")) return { rows: [{ total: 1 }] };
+      if (sql.includes("SELECT id, status FROM rotas_paradas WHERE plano_id")) return { rows: [] };
+      if (sql.includes("DELETE FROM rotas_planos")) return { rows: [] };
+      if (sql.includes("UPDATE rotas_planos SET")) return { rows: [] };
       throw new Error(`Consulta inesperada no teste: ${sql}`);
     },
     release() {},
@@ -186,25 +192,41 @@ test("nao realizada copia somente a parada e devolve o vinculo do reagendamento"
     motivo: "Cliente pediu outra data",
     reagendarPara: rescheduleDate,
   });
-  assert.equal(response.parada.status, "nao_realizada");
+  assert.equal(response.parada.id, 20);
+  assert.equal(response.parada.plano_id, 30);
+  assert.equal(response.parada.status, "pendente");
   assert.deepEqual(response.reagendamento, {
-    planoId: 30, paradaId: 40, titulo: "Reagendamentos", data: rescheduleDate,
+    planoId: 30, paradaId: 20, titulo: "Reagendamentos", data: rescheduleDate,
   });
-  assert.equal(queries.filter((sql) => sql.includes("INSERT INTO rotas_paradas")).length, 1);
+  assert.equal(response.rotaOrigemRemovida, true);
+  assert.equal(queries.some((sql) => sql.includes("INSERT INTO rotas_paradas")), false);
+  assert.equal(queries.some((sql) => sql.includes("DELETE FROM rotas_planos")), true);
   assert.ok(queries.includes("COMMIT"));
 });
 
-test("reagendamento repetido e recusado antes de copiar a parada", async () => {
+test("reagendamento mantem a rota anterior quando ainda existem outras visitas", async () => {
   const queries = [];
   const planDate = isoDateOffset(1);
   const rescheduleDate = isoDateOffset(2);
-  const plan = { id: 10, tecnico_id: 3, data: planDate, status: "publicada", tecnico_nome: "Tecnico" };
+  const plan = {
+    id: 10, tecnico_id: 3, data: planDate, status: "publicada", tecnico_nome: "Tecnico",
+    origem_nome: "Empresa", origem_endereco: "Base", origem_latitude: -8.28, origem_longitude: -35.97,
+  };
   const connection = {
     async query(sql) {
       queries.push(sql);
-      if (sql === "BEGIN" || sql === "ROLLBACK") return { rows: [] };
+      if (sql === "BEGIN" || sql === "COMMIT" || sql.includes("pg_advisory_xact_lock") || sql.includes("SET CONSTRAINTS")) return { rows: [] };
       if (sql.includes("FROM rotas_paradas WHERE id = $1") && sql.includes("FOR UPDATE")) return { rows: [{ id: 20, plano_id: 10 }] };
-      if (sql.includes("WHERE rp.reagendada_de_id = $1")) return { rows: [{ id: 40, plano_id: 30, data: rescheduleDate, titulo: "Reagendamentos" }] };
+      if (sql.includes("FROM rotas_planos") && sql.includes("titulo = 'Reagendamentos'")) {
+        return { rows: [{ ...plan, id: 30, data: rescheduleDate, status: "rascunho", titulo: "Reagendamentos" }] };
+      }
+      if (sql.includes("COALESCE(MAX(ordem)")) return { rows: [{ proxima: 2 }] };
+      if (sql.includes("SET plano_id = $1") && sql.includes("historico_reagendamentos")) {
+        return { rows: [{ id: 20, plano_id: 30, ordem: 2, status: "pendente", reagendada_de_data: planDate, reagendada_para: rescheduleDate }] };
+      }
+      if (sql.includes("SELECT id, status FROM rotas_paradas WHERE plano_id")) return { rows: [{ id: 21, status: "pendente" }] };
+      if (sql.includes("UPDATE rotas_paradas SET ordem")) return { rows: [] };
+      if (sql.includes("UPDATE rotas_planos")) return { rows: [] };
       throw new Error(`Consulta inesperada no teste: ${sql}`);
     },
     release() {},
@@ -217,12 +239,16 @@ test("reagendamento repetido e recusado antes de copiar a parada", async () => {
     async connect() { return connection; },
   };
 
-  await assert.rejects(
-    invokeStopStatus(pool, { status: "nao_realizada", motivo: "Cliente pediu", reagendarPara: rescheduleDate }),
-    (error) => error.status === 409 && /ja foi reagendada/.test(error.message),
-  );
+  const response = await invokeStopStatus(pool, {
+    status: "nao_realizada", motivo: "Cliente pediu", reagendarPara: rescheduleDate,
+  });
+  assert.equal(response.parada.id, 20);
+  assert.equal(response.parada.plano_id, 30);
+  assert.equal(response.rotaOrigemRemovida, false);
+  assert.equal(response.rotaOrigemStatus, "publicada");
   assert.equal(queries.some((sql) => sql.includes("INSERT INTO rotas_paradas")), false);
-  assert.ok(queries.includes("ROLLBACK"));
+  assert.equal(queries.some((sql) => sql.includes("DELETE FROM rotas_planos")), false);
+  assert.ok(queries.includes("COMMIT"));
 });
 
 test("conclusao exige e registra o relato sem criar reagendamento", async () => {
@@ -234,9 +260,8 @@ test("conclusao exige e registra o relato sem criar reagendamento", async () => 
       queries.push(sql);
       if (sql === "BEGIN" || sql === "COMMIT") return { rows: [] };
       if (sql.includes("FROM rotas_paradas WHERE id = $1") && sql.includes("FOR UPDATE")) return { rows: [source] };
-      if (sql.includes("WHERE rp.reagendada_de_id = $1")) return { rows: [] };
-      if (sql.includes("UPDATE rotas_paradas") && sql.includes("motivo_status")) {
-        return { rows: [{ ...source, status: "concluida", motivo_status: "Servico validado", reagendada_para: null }] };
+      if (sql.includes("UPDATE rotas_paradas") && sql.includes("relato_conclusao")) {
+        return { rows: [{ ...source, status: "concluida", relato_conclusao: "Servico validado", reagendada_para: null }] };
       }
       if (sql.includes("COUNT(*)::int AS total")) return { rows: [{ total: 1 }] };
       throw new Error(`Consulta inesperada no teste: ${sql}`);
@@ -252,7 +277,7 @@ test("conclusao exige e registra o relato sem criar reagendamento", async () => 
   };
 
   const response = await invokeStopStatus(pool, { status: "concluida", motivo: "Servico validado" });
-  assert.equal(response.parada.motivo_status, "Servico validado");
+  assert.equal(response.parada.relato_conclusao, "Servico validado");
   assert.equal(response.reagendamento, null);
   assert.equal(queries.some((sql) => sql.includes("INSERT INTO rotas_planos")), false);
 });
