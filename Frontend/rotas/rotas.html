@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="UTF-8" />
@@ -8,28 +8,58 @@
     <meta name="theme-color" content="#102b1c" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.de https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.de https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
     <title>Conecta - Rotas externas</title>
     <link rel="icon" href="/favicon.ico?v=3" type="image/x-icon" />
     <link rel="apple-touch-icon" href="/icons/conecta-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="stylesheet" href="/vendor/leaflet/leaflet.css?v=1.9.4" />
-    <link rel="stylesheet" href="rotas.css?v=1.2.1" />
+    <link rel="stylesheet" href="rotas.css?v=1.2.2" />
   </head>
   <body>
-    <div id="globalLoading" class="global-loading hidden" aria-label="Carregando"><span></span></div>
+    <div
+      id="globalLoading"
+      class="global-loading hidden"
+      aria-label="Carregando"
+    >
+      <span></span>
+    </div>
     <div id="loginView" class="auth-shell">
       <section class="auth-card">
         <a class="back-link" href="../index.html">← Voltar ao sistema</a>
-        <div class="auth-brand"><img src="/conectapc-logo.png?v=1" alt="Conecta" /></div>
+        <div class="auth-brand">
+          <img src="/conectapc-logo.png?v=1" alt="Conecta" />
+        </div>
         <p class="eyebrow">Área protegida</p>
         <h1>Rotas externas</h1>
-        <p class="auth-copy">Entre como ADM/Supervisor ou técnico para continuar.</p>
+        <p class="auth-copy">
+          Entre como ADM/Supervisor ou técnico para continuar.
+        </p>
         <div id="setupWarning" class="alert warning hidden"></div>
         <form id="loginForm">
-          <label>Usuário<input id="loginUsuario" type="text" autocomplete="username" required maxlength="80" /></label>
-          <label>Senha<input id="loginSenha" type="password" autocomplete="current-password" required maxlength="200" /></label>
+          <label
+            >Usuário<input
+              id="loginUsuario"
+              type="text"
+              autocomplete="username"
+              required
+              maxlength="80"
+          /></label>
+          <label
+            >Senha<input
+              id="loginSenha"
+              type="password"
+              autocomplete="current-password"
+              required
+              maxlength="200"
+          /></label>
           <button id="loginButton" type="submit">Entrar</button>
         </form>
         <p id="loginError" class="form-error" role="alert"></p>
@@ -40,12 +70,43 @@
       <section class="auth-card">
         <p class="eyebrow">Primeiro acesso</p>
         <h1>Defina uma nova senha</h1>
-        <p class="auth-copy">A nova senha precisa ter pelo menos 10 caracteres.</p>
+        <p class="auth-copy">
+          A nova senha precisa ter pelo menos 10 caracteres.
+        </p>
         <form id="passwordForm">
-          <label>Senha atual<input id="senhaAtual" type="password" autocomplete="current-password" required /></label>
-          <label>Nova senha<input id="novaSenha" type="password" autocomplete="new-password" minlength="10" required /></label>
-          <label>Confirmar nova senha<input id="confirmarSenha" type="password" autocomplete="new-password" minlength="10" required /></label>
-          <div class="inline-actions"><button type="submit">Salvar nova senha</button><button id="cancelPasswordButton" type="button" class="ghost-button hidden">Cancelar</button></div>
+          <label
+            >Senha atual<input
+              id="senhaAtual"
+              type="password"
+              autocomplete="current-password"
+              required
+          /></label>
+          <label
+            >Nova senha<input
+              id="novaSenha"
+              type="password"
+              autocomplete="new-password"
+              minlength="10"
+              required
+          /></label>
+          <label
+            >Confirmar nova senha<input
+              id="confirmarSenha"
+              type="password"
+              autocomplete="new-password"
+              minlength="10"
+              required
+          /></label>
+          <div class="inline-actions">
+            <button type="submit">Salvar nova senha</button
+            ><button
+              id="cancelPasswordButton"
+              type="button"
+              class="ghost-button hidden"
+            >
+              Cancelar
+            </button>
+          </div>
         </form>
         <p id="passwordError" class="form-error" role="alert"></p>
       </section>
@@ -53,139 +114,457 @@
 
     <div id="appView" class="app-shell hidden">
       <aside class="sidebar">
-        <div class="brand"><img src="/conectapc-logo.png?v=1" alt="" /><div><strong>Conecta</strong><span>Rotas externas</span></div></div>
+        <div class="brand">
+          <img src="/conectapc-logo.png?v=1" alt="" />
+          <div><strong>Conecta</strong><span>Rotas externas</span></div>
+        </div>
         <nav id="moduleNav">
-          <button type="button" class="nav-item active" data-panel="planejamento">Planejamento</button>
-          <button type="button" class="nav-item supervisor-only" data-panel="tecnicos">Técnicos</button>
-          <button type="button" class="nav-item supervisor-only" data-panel="usuarios">Usuários</button>
-          <button type="button" class="nav-item supervisor-only" data-panel="configuracao">Base da empresa</button>
+          <button
+            type="button"
+            class="nav-item active"
+            data-panel="planejamento"
+          >
+            Planejamento
+          </button>
+          <button
+            type="button"
+            class="nav-item supervisor-only"
+            data-panel="tecnicos"
+          >
+            Técnicos
+          </button>
+          <button
+            type="button"
+            class="nav-item supervisor-only"
+            data-panel="usuarios"
+          >
+            Usuários
+          </button>
+          <button
+            type="button"
+            class="nav-item supervisor-only"
+            data-panel="configuracao"
+          >
+            Base da empresa
+          </button>
         </nav>
         <a class="system-link" href="../index.html">← Sistema principal</a>
       </aside>
 
       <main class="content">
         <header class="topbar">
-          <div><p class="eyebrow">Operação externa</p><h1 id="pageTitle">Planejamento</h1></div>
+          <div>
+            <p class="eyebrow">Operação externa</p>
+            <h1 id="pageTitle">Planejamento</h1>
+          </div>
           <div class="user-area">
-            <div><strong id="userName">-</strong><span id="userRole">-</span></div>
-            <button id="changePasswordButton" type="button" class="ghost-button">Senha</button>
-            <button id="logoutButton" type="button" class="ghost-button">Sair</button>
+            <div>
+              <strong id="userName">-</strong><span id="userRole">-</span>
+            </div>
+            <button
+              id="changePasswordButton"
+              type="button"
+              class="ghost-button"
+            >
+              Senha
+            </button>
+            <button id="logoutButton" type="button" class="ghost-button">
+              Sair
+            </button>
           </div>
         </header>
 
         <section id="planejamentoPanel" class="panel active">
           <div class="toolbar">
-            <label class="supervisor-only">Técnico<select id="routeTechnician"><option value="">Selecione</option></select></label>
+            <label class="supervisor-only"
+              >Técnico<select id="routeTechnician">
+                <option value="">Selecione</option>
+              </select></label
+            >
             <label>Data<input id="routeDate" type="date" /></label>
-            <label class="supervisor-only route-name-field">Nome da nova rota<input id="routeName" type="text" maxlength="120" placeholder="Ex.: Rota manhã" /></label>
-            <button id="loadRoutesButton" type="button" class="secondary-button">Consultar</button>
-            <button id="showAllRoutesButton" type="button" class="secondary-button">Todas as datas</button>
-            <button id="createRouteButton" type="button" class="supervisor-only">Criar rota do dia</button>
+            <label class="supervisor-only route-name-field"
+              >Nome da nova rota<input
+                id="routeName"
+                type="text"
+                maxlength="120"
+                placeholder="Ex.: Rota manhã"
+            /></label>
+            <button
+              id="loadRoutesButton"
+              type="button"
+              class="secondary-button"
+            >
+              Consultar
+            </button>
+            <button
+              id="showAllRoutesButton"
+              type="button"
+              class="secondary-button"
+            >
+              Todas as datas
+            </button>
+            <button
+              id="createRouteButton"
+              type="button"
+              class="supervisor-only"
+            >
+              Criar rota do dia
+            </button>
           </div>
-          <p class="route-rule">Toda rota começa na base da empresa e retorna para a mesma base após a última parada.</p>
+          <p class="route-rule">
+            Toda rota começa na base da empresa e retorna para a mesma base após
+            a última parada.
+          </p>
 
           <div id="emptyRoute" class="empty-state">
             <h2>Selecione a data da rota</h2>
-            <p id="emptyRouteText">Escolha um técnico e uma data para consultar ou criar o planejamento.</p>
+            <p id="emptyRouteText">
+              Escolha um técnico e uma data para consultar ou criar o
+              planejamento.
+            </p>
           </div>
 
           <section id="routesDashboard" class="routes-dashboard hidden">
             <div class="dashboard-heading">
-              <div><p class="eyebrow">Visão rápida</p><h2 id="routesDashboardTitle">Rotas encontradas</h2></div>
-              <strong id="routesDashboardCount" class="dashboard-count">0 rotas</strong>
+              <div>
+                <p class="eyebrow">Visão rápida</p>
+                <h2 id="routesDashboardTitle">Rotas encontradas</h2>
+              </div>
+              <strong id="routesDashboardCount" class="dashboard-count"
+                >0 rotas</strong
+              >
             </div>
             <div id="routeCards" class="route-cards"></div>
           </section>
 
           <div id="routeWorkspace" class="route-workspace hidden">
             <section class="route-sidebar">
-              <button id="backToRoutesButton" type="button" class="back-dashboard-button secondary-button">← Voltar para as rotas</button>
+              <button
+                id="backToRoutesButton"
+                type="button"
+                class="back-dashboard-button secondary-button"
+              >
+                ← Voltar para as rotas
+              </button>
               <div class="route-heading">
-                <div><p id="routeDateLabel" class="eyebrow">-</p><h2 id="routeTitle">-</h2><p id="routeTechnicianName" class="route-technician-name">-</p></div>
+                <div>
+                  <p id="routeDateLabel" class="eyebrow">-</p>
+                  <h2 id="routeTitle">-</h2>
+                  <p id="routeTechnicianName" class="route-technician-name">
+                    -
+                  </p>
+                </div>
                 <span id="routeStatus" class="status-pill">Rascunho</span>
               </div>
               <div class="route-summary">
-                <div><span>Paradas</span><strong id="summaryStops">0</strong></div>
-                <div><span>Distância</span><strong id="summaryDistance">-</strong></div>
-                <div><span>Tempo de percurso</span><strong id="summaryDuration">-</strong></div>
+                <div>
+                  <span>Paradas</span><strong id="summaryStops">0</strong>
+                </div>
+                <div>
+                  <span>Distância</span><strong id="summaryDistance">-</strong>
+                </div>
+                <div>
+                  <span>Tempo de percurso</span
+                  ><strong id="summaryDuration">-</strong>
+                </div>
               </div>
               <div id="routeWarning" class="alert warning hidden"></div>
 
               <div class="route-actions supervisor-only">
-                <button id="newStopButton" type="button" class="secondary-button">+ Adicionar parada</button>
+                <button
+                  id="newStopButton"
+                  type="button"
+                  class="secondary-button"
+                >
+                  + Adicionar parada
+                </button>
                 <button id="optimizeButton" type="button">Otimizar rota</button>
-                <button id="publishButton" type="button" class="success-button">Publicar</button>
-                <button id="deleteRouteButton" type="button" class="danger-button">Excluir rota</button>
+                <button id="publishButton" type="button" class="success-button">
+                  Publicar
+                </button>
+                <button
+                  id="deleteRouteButton"
+                  type="button"
+                  class="danger-button"
+                >
+                  Excluir rota
+                </button>
               </div>
-              <a id="openFullRoute" href="#" class="map-link hidden" target="_blank" rel="noopener">Abrir rota no Google Maps</a>
+              <a
+                id="openFullRoute"
+                href="#"
+                class="map-link hidden"
+                target="_blank"
+                rel="noopener"
+                >Abrir rota no Google Maps</a
+              >
 
               <form id="stopForm" class="inline-form hidden">
                 <input id="editingStopId" type="hidden" />
                 <h3 id="stopFormTitle">Nova parada</h3>
-                <label>Cliente<input id="stopClient" type="text" required maxlength="160" /></label>
-                <label>Endereço<textarea id="stopAddress" required maxlength="300"></textarea></label>
+                <label
+                  >Cliente<input
+                    id="stopClient"
+                    type="text"
+                    required
+                    maxlength="160"
+                /></label>
+                <label
+                  >Endereço<textarea
+                    id="stopAddress"
+                    required
+                    maxlength="300"
+                  ></textarea>
+                </label>
                 <div class="inline-actions">
-                  <button id="searchStopAddress" type="button" class="secondary-button">Buscar endereço</button>
-                  <button id="markStopMap" type="button" class="secondary-button">Marcar no mapa</button>
+                  <button
+                    id="searchStopAddress"
+                    type="button"
+                    class="secondary-button"
+                  >
+                    Buscar endereço
+                  </button>
+                  <button
+                    id="markStopMap"
+                    type="button"
+                    class="secondary-button"
+                  >
+                    Marcar no mapa
+                  </button>
                 </div>
-                <p class="address-search-hint">A busca prioriza endereços em Pernambuco e usa a base da empresa como referência de proximidade.</p>
-                <p id="stopGeocodeHelp" class="helper-text hidden">Busca automática não configurada. Use “Marcar no mapa” ou configure ORS_API_KEY.</p>
+                <p class="address-search-hint">
+                  A busca prioriza endereços em Pernambuco e usa a base da
+                  empresa como referência de proximidade.
+                </p>
+                <p id="stopGeocodeHelp" class="helper-text hidden">
+                  Busca automática não configurada. Use “Marcar no mapa” ou
+                  configure ORS_API_KEY.
+                </p>
                 <div id="stopSearchResults" class="search-results hidden"></div>
                 <div class="two-columns">
-                  <label>Latitude<input id="stopLatitude" type="number" step="any" required /></label>
-                  <label>Longitude<input id="stopLongitude" type="number" step="any" required /></label>
+                  <label
+                    >Latitude<input
+                      id="stopLatitude"
+                      type="number"
+                      step="any"
+                      required
+                  /></label>
+                  <label
+                    >Longitude<input
+                      id="stopLongitude"
+                      type="number"
+                      step="any"
+                      required
+                  /></label>
                 </div>
                 <div class="two-columns">
-                  <label>Início opcional<input id="stopStart" type="time" /></label>
+                  <label
+                    >Início opcional<input id="stopStart" type="time"
+                  /></label>
                   <label>Fim opcional<input id="stopEnd" type="time" /></label>
                 </div>
-                <label>Duração no cliente (min)<input id="stopDuration" type="number" min="0" max="1440" value="30" /></label>
-                <label>Observações<textarea id="stopNotes" maxlength="500"></textarea></label>
-                <p id="pinHelp" class="pin-help hidden">Clique no mapa para confirmar o ponto da parada.</p>
-                <div class="inline-actions"><button type="submit">Salvar parada</button><button id="cancelStopButton" type="button" class="ghost-button">Cancelar</button></div>
+                <label
+                  >Duração no cliente (min)<input
+                    id="stopDuration"
+                    type="number"
+                    min="0"
+                    max="1440"
+                    value="30"
+                /></label>
+                <label
+                  >Observações<textarea
+                    id="stopNotes"
+                    maxlength="500"
+                  ></textarea>
+                </label>
+                <p id="pinHelp" class="pin-help hidden">
+                  Clique no mapa para confirmar o ponto da parada.
+                </p>
+                <div class="inline-actions">
+                  <button type="submit">Salvar parada</button
+                  ><button
+                    id="cancelStopButton"
+                    type="button"
+                    class="ghost-button"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </form>
 
               <div id="stopsList" class="stops-list"></div>
             </section>
-            <section class="map-section"><div id="routeMap"></div><div id="mapHint" class="map-hint hidden">Clique no local correto da parada</div></section>
+            <section class="map-section">
+              <div id="routeMap"></div>
+              <div id="mapHint" class="map-hint hidden">
+                Clique no local correto da parada
+              </div>
+            </section>
           </div>
         </section>
 
         <section id="tecnicosPanel" class="panel">
-          <div class="section-header"><div><p class="eyebrow">Equipe externa</p><h2>Técnicos</h2></div></div>
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Equipe externa</p>
+              <h2>Técnicos</h2>
+            </div>
+          </div>
           <form id="technicianForm" class="management-form">
-            <label>Nome<input id="technicianName" type="text" required maxlength="120" /></label>
-            <label>Telefone<input id="technicianPhone" type="tel" maxlength="40" /></label>
+            <label
+              >Nome<input
+                id="technicianName"
+                type="text"
+                required
+                maxlength="120"
+            /></label>
+            <label
+              >Telefone<input id="technicianPhone" type="tel" maxlength="40"
+            /></label>
             <button type="submit">Adicionar técnico</button>
           </form>
-          <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Telefone</th><th>Status</th><th>Ações</th></tr></thead><tbody id="techniciansTable"></tbody></table></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Telefone</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="techniciansTable"></tbody>
+            </table>
+          </div>
         </section>
 
         <section id="usuariosPanel" class="panel">
-          <div class="section-header"><div><p class="eyebrow">Acesso protegido</p><h2>Usuários</h2></div></div>
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Acesso protegido</p>
+              <h2>Usuários</h2>
+            </div>
+          </div>
           <form id="userForm" class="management-form user-form">
-            <label>Nome<input id="newUserName" type="text" required maxlength="120" /></label>
-            <label>Usuário<input id="newUserLogin" type="text" required maxlength="80" placeholder="nome.sobrenome" /></label>
-            <label>Perfil<select id="newUserRole"><option value="tecnico">Técnico</option><option value="supervisor">ADM/Supervisor</option></select></label>
-            <label id="userTechnicianLabel">Técnico vinculado<select id="newUserTechnician" required></select></label>
-            <label>Senha inicial<input id="newUserPassword" type="password" autocomplete="new-password" minlength="10" required /></label>
+            <label
+              >Nome<input id="newUserName" type="text" required maxlength="120"
+            /></label>
+            <label
+              >Usuário<input
+                id="newUserLogin"
+                type="text"
+                required
+                maxlength="80"
+                placeholder="nome.sobrenome"
+            /></label>
+            <label
+              >Perfil<select id="newUserRole">
+                <option value="tecnico">Técnico</option>
+                <option value="supervisor">ADM/Supervisor</option>
+              </select></label
+            >
+            <label id="userTechnicianLabel"
+              >Técnico vinculado<select id="newUserTechnician" required></select
+            ></label>
+            <label
+              >Senha inicial<input
+                id="newUserPassword"
+                type="password"
+                autocomplete="new-password"
+                minlength="10"
+                required
+            /></label>
             <button type="submit">Criar usuário</button>
           </form>
-          <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Usuário</th><th>Perfil</th><th>Vínculo</th><th>Status</th><th>Ações</th></tr></thead><tbody id="usersTable"></tbody></table></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Usuário</th>
+                  <th>Perfil</th>
+                  <th>Vínculo</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="usersTable"></tbody>
+            </table>
+          </div>
         </section>
 
         <section id="configuracaoPanel" class="panel">
-          <div class="section-header"><div><p class="eyebrow">Saída e retorno fixos</p><h2>Base da empresa</h2><p class="section-copy">Cadastre o ponto da nossa empresa uma única vez. Ele será usado como início e fim de todas as rotas.</p></div></div>
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Saída e retorno fixos</p>
+              <h2>Base da empresa</h2>
+              <p class="section-copy">
+                Cadastre o ponto da nossa empresa uma única vez. Ele será usado
+                como início e fim de todas as rotas.
+              </p>
+            </div>
+          </div>
           <div class="config-layout">
             <form id="companyForm" class="company-form">
-              <label>Nome da base<input id="companyName" type="text" required maxlength="120" /></label>
-              <label>Endereço completo da base<textarea id="companyAddress" required maxlength="300"></textarea></label>
-              <p class="address-search-hint">Informe rua, número, bairro e cidade. A busca prioriza Pernambuco.</p>
-              <div class="inline-actions"><button id="searchCompanyAddress" type="button" class="secondary-button">Buscar endereço</button><button id="markCompanyMap" type="button" class="secondary-button">Marcar no mapa</button></div>
-              <p id="companyGeocodeHelp" class="helper-text hidden">Busca automática não configurada. Use “Marcar no mapa” ou configure ORS_API_KEY.</p>
-              <div id="companySearchResults" class="search-results hidden"></div>
-              <div class="two-columns"><label>Latitude<input id="companyLatitude" type="number" step="any" required /></label><label>Longitude<input id="companyLongitude" type="number" step="any" required /></label></div>
-              <p id="companyPinHelp" class="pin-help hidden">Clique no mapa para confirmar a localização da base.</p>
+              <label
+                >Nome da base<input
+                  id="companyName"
+                  type="text"
+                  required
+                  maxlength="120"
+              /></label>
+              <label
+                >Endereço completo da base<textarea
+                  id="companyAddress"
+                  required
+                  maxlength="300"
+                ></textarea>
+              </label>
+              <p class="address-search-hint">
+                Informe rua, número, bairro e cidade. A busca prioriza
+                Pernambuco.
+              </p>
+              <div class="inline-actions">
+                <button
+                  id="searchCompanyAddress"
+                  type="button"
+                  class="secondary-button"
+                >
+                  Buscar endereço</button
+                ><button
+                  id="markCompanyMap"
+                  type="button"
+                  class="secondary-button"
+                >
+                  Marcar no mapa
+                </button>
+              </div>
+              <p id="companyGeocodeHelp" class="helper-text hidden">
+                Busca automática não configurada. Use “Marcar no mapa” ou
+                configure ORS_API_KEY.
+              </p>
+              <div
+                id="companySearchResults"
+                class="search-results hidden"
+              ></div>
+              <div class="two-columns">
+                <label
+                  >Latitude<input
+                    id="companyLatitude"
+                    type="number"
+                    step="any"
+                    required /></label
+                ><label
+                  >Longitude<input
+                    id="companyLongitude"
+                    type="number"
+                    step="any"
+                    required
+                /></label>
+              </div>
+              <p id="companyPinHelp" class="pin-help hidden">
+                Clique no mapa para confirmar a localização da base.
+              </p>
               <button type="submit">Salvar base da empresa</button>
             </form>
             <div id="companyMap"></div>
@@ -194,7 +573,13 @@
       </main>
     </div>
 
-    <div id="stopStatusModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="stopStatusModalTitle">
+    <div
+      id="stopStatusModal"
+      class="modal-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="stopStatusModalTitle"
+    >
       <section class="modal-card">
         <form id="stopStatusForm">
           <input id="statusStopId" type="hidden" />
@@ -202,15 +587,30 @@
           <p class="eyebrow">Registro do atendimento</p>
           <h2 id="stopStatusModalTitle">Finalizar visita</h2>
           <p id="stopStatusModalCopy" class="modal-copy"></p>
-          <label id="statusReasonLabel">Observação
-            <textarea id="statusReason" maxlength="500" required placeholder="Descreva o que aconteceu no atendimento."></textarea>
+          <label id="statusReasonLabel"
+            >Observação
+            <textarea
+              id="statusReason"
+              maxlength="500"
+              required
+              placeholder="Descreva o que aconteceu no atendimento."
+            ></textarea>
           </label>
-          <label id="rescheduleDateLabel" class="hidden">Reagendar para
+          <label id="rescheduleDateLabel" class="hidden"
+            >Reagendar para
             <input id="rescheduleDate" type="date" />
           </label>
           <div class="modal-actions">
-            <button id="cancelStopStatusButton" type="button" class="ghost-button">Cancelar</button>
-            <button id="confirmStopStatusButton" type="submit">Confirmar</button>
+            <button
+              id="cancelStopStatusButton"
+              type="button"
+              class="ghost-button"
+            >
+              Cancelar
+            </button>
+            <button id="confirmStopStatusButton" type="submit">
+              Confirmar
+            </button>
           </div>
         </form>
       </section>
@@ -218,6 +618,6 @@
 
     <div id="toastRegion" class="toast-region" aria-live="polite"></div>
     <script src="/vendor/leaflet/leaflet.js?v=1.9.4"></script>
-    <script src="rotas.js?v=1.2.1"></script>
+    <script src="rotas.js?v=1.2.2"></script>
   </body>
 </html>
