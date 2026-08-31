@@ -180,6 +180,16 @@ textarea:focus-visible,
   letter-spacing: -0.03em;
 }
 
+.nav-svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .nav-copy {
   min-width: 0;
   display: block;

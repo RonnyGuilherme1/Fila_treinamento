@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico?v=3" type="image/x-icon" />
     <title>Conecta - Controle</title>
-    <link rel="stylesheet" href="style.css?v=1.4.0" />
+    <link rel="stylesheet" href="style.css?v=1.5.0" />
   </head>
 
   <body>
@@ -19,23 +19,23 @@
         <nav class="menu" aria-label="Navegação principal">
           <div class="menu-label">Operação</div>
           <button class="nav-button active" data-tab="treinamento" onclick="trocarAba('treinamento')">
-            <span class="nav-icon" aria-hidden="true">T</span><span class="nav-copy"><strong>Treinamento</strong></span>
+            <span class="nav-icon" aria-hidden="true"><svg class="nav-svg" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 5.5v15M8 7h8M8 11h7"/></svg></span><span class="nav-copy"><strong>Treinamento</strong></span>
           </button>
           <button class="nav-button" data-tab="manutencao" onclick="trocarAba('manutencao')">
-            <span class="nav-icon" aria-hidden="true">M</span><span class="nav-copy"><strong>Manutenção</strong></span>
+            <span class="nav-icon" aria-hidden="true"><svg class="nav-svg" viewBox="0 0 24 24"><path d="m14.7 6.3 3-3 3 3-3 3"/><path d="M17.7 6.3 11 13l-2.5-2.5L15.2 3.8"/><path d="m8.5 11.5-5 5a2.1 2.1 0 0 0 3 3l5-5"/></svg></span><span class="nav-copy"><strong>Manutenção</strong></span>
           </button>
           <div class="menu-label menu-label-spaced">Gestão</div>
           <button class="nav-button" data-tab="configuracoes" onclick="trocarAba('configuracoes')">
-            <span class="nav-icon" aria-hidden="true">C</span><span class="nav-copy"><strong>Configurações</strong></span>
+            <span class="nav-icon" aria-hidden="true"><svg class="nav-svg" viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19.4 15 .1.1a1.8 1.8 0 1 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3.1 1.3v.2a1.8 1.8 0 1 1-3.6 0v-.2a1.8 1.8 0 0 0-3.1-1.3l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-1.3-3.1h-.2a1.8 1.8 0 1 1 0-3.6h.2a1.8 1.8 0 0 0 1.3-3.1l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3.1-1.3v-.2a1.8 1.8 0 1 1 3.6 0v.2a1.8 1.8 0 0 0 3.1 1.3l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 1.3 3.1h.2a1.8 1.8 0 1 1 0 3.6h-.2a1.8 1.8 0 0 0-1.3 3.1Z"/></svg></span><span class="nav-copy"><strong>Configurações</strong></span>
           </button>
           <button class="nav-button" onclick="abrirRotasExternas()">
-            <span class="nav-icon" aria-hidden="true">R</span><span class="nav-copy"><strong>Rotas externas</strong></span>
+            <span class="nav-icon" aria-hidden="true"><svg class="nav-svg" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="nav-copy"><strong>Rotas externas</strong></span>
           </button>
           <button class="nav-button" onclick="window.location.href = 'historico/historico.html'">
-            <span class="nav-icon" aria-hidden="true">H</span><span class="nav-copy"><strong>Histórico</strong></span>
+            <span class="nav-icon" aria-hidden="true"><svg class="nav-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/><path d="M4 5v4h4"/></svg></span><span class="nav-copy"><strong>Histórico</strong></span>
           </button>
           <button class="nav-button" onclick="window.open('tv/tv.html')">
-            <span class="nav-icon" aria-hidden="true">TV</span><span class="nav-copy"><strong>Painel TV</strong></span>
+            <span class="nav-icon" aria-hidden="true"><svg class="nav-svg" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="13" rx="2"/><path d="m8 21 4-3 4 3M8 9h8M8 13h5"/></svg></span><span class="nav-copy"><strong>Painel TV</strong></span>
           </button>
         </nav>
       </aside>
