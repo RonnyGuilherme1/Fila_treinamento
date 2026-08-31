@@ -200,21 +200,6 @@ textarea:focus-visible,
   box-shadow: none;
 }
 
-.sidebar-footer {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: auto;
-  padding: 15px 10px 3px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.sidebar-footer strong {
-  color: #f0fdf4;
-  font-size: 0.74rem;
-}
-
-.status-dot,
 .live-status i {
   width: 8px;
   height: 8px;
@@ -963,10 +948,6 @@ tbody tr:hover {
   .brand {
     padding: 5px 6px 14px;
     margin-bottom: 12px;
-  }
-
-  .sidebar-footer {
-    display: none;
   }
 
   .menu {
