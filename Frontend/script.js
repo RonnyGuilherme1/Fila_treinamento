@@ -528,9 +528,9 @@ function renderConfigFila(tipo, lista) {
           <td><span class="status-pill ${ativo ? "active" : "inactive"}">${textoStatus}</span></td>
           <td>
             <div class="config-actions">
-              <button class="config-action-btn secondary" ${index === 0 ? "disabled" : ""} onclick="moverTecnicoFila('${tipo}', ${tecnico.id}, 'subir', this)">Subir</button>
-              <button class="config-action-btn secondary" ${index === lista.length - 1 ? "disabled" : ""} onclick="moverTecnicoFila('${tipo}', ${tecnico.id}, 'descer', this)">Descer</button>
-              <button class="config-action-btn ${ativo ? "warning" : ""}" onclick="alternarTecnicoFila('${tipo}', ${tecnico.id}, ${proximoStatus}, this)">${textoAlternar}</button>
+              <button class="config-action-btn secondary icon-action" title="Mover para cima" aria-label="Mover ${escapeHTML(tecnico.nome || "técnico")} para cima" ${index === 0 ? "disabled" : ""} onclick="moverTecnicoFila('${tipo}', ${tecnico.id}, 'subir', this)">↑</button>
+              <button class="config-action-btn secondary icon-action" title="Mover para baixo" aria-label="Mover ${escapeHTML(tecnico.nome || "técnico")} para baixo" ${index === lista.length - 1 ? "disabled" : ""} onclick="moverTecnicoFila('${tipo}', ${tecnico.id}, 'descer', this)">↓</button>
+              <button class="config-action-btn ${ativo ? "warning" : ""}" title="${textoAlternar} técnico" onclick="alternarTecnicoFila('${tipo}', ${tecnico.id}, ${proximoStatus}, this)">${textoAlternar}</button>
             </div>
           </td>
         </tr>

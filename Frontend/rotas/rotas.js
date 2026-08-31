@@ -16,6 +16,7 @@ const state = {
   companyMarker: null,
   temporaryStopMarker: null,
   pinMode: null,
+  quickStatusContext: null,
   capabilities: { buscaAutomatica: false, calculoViario: false },
 };
 
@@ -357,7 +358,7 @@ async function loadInitialData() {
     loadCompanyConfig(),
     state.user.perfil === "supervisor" ? loadUsers() : Promise.resolve(),
   ]);
-  if (state.user.perfil === "tecnico") await loadPlans();
+  if (state.user.perfil === "tecnico" || state.user.perfil === "supervisor") await loadPlans();
 }
 
 async function loadCapabilities() {
@@ -374,7 +375,10 @@ function switchPanel(name, button) {
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item === button));
   const titles = { planejamento: "Planejamento", tecnicos: "Técnicos", usuarios: "Usuários", configuracao: "Base da empresa" };
   element("pageTitle").textContent = titles[name];
-  if (name === "planejamento") setTimeout(() => state.routeMap?.invalidateSize(), 50);
+  if (name === "planejamento") setTimeout(() => {
+    state.routeMap?.invalidateSize({ pan: false });
+    if (state.plan) renderRouteMap();
+  }, 80);
   if (name === "configuracao") {
     setTimeout(() => {
       try {
@@ -391,7 +395,7 @@ function switchPanel(name, button) {
 async function loadTechnicians() {
   state.technicians = await request("/tecnicos");
   const active = state.technicians.filter((item) => item.ativo);
-  element("routeTechnician").innerHTML = '<option value="">Selecione</option>'
+  element("routeTechnician").innerHTML = '<option value="">Todos os técnicos</option>'
     + active.map((item) => `<option value="${item.id}">${escapeHTML(item.nome)}</option>`).join("");
   element("newUserTechnician").innerHTML = '<option value="">Selecione</option>'
     + active.map((item) => `<option value="${item.id}">${escapeHTML(item.nome)}</option>`).join("");
@@ -564,9 +568,7 @@ function planTotalDuration(plan) {
   return Number(plan.duracao_segundos || 0) + Number(plan.duracao_clientes_min || 0) * 60;
 }
 
-function renderPlanCards() {
-  const container = element("routeCards");
-  container.innerHTML = state.plans.map((plan) => {
+function renderPlanCard(plan) {
     const stops = Array.isArray(plan.paradas) ? plan.paradas : [];
     const destinations = stops.slice(0, 4).map((stop) => {
       const rescheduleBadge = stop.reagendada_de_data
@@ -574,7 +576,14 @@ function renderPlanCards() {
         : stop.reagendada_para
           ? `<small class="reschedule-badge">Transferida para ${formatDate(stop.reagendada_para)}</small>`
           : "";
-      return `<li><span>${escapeHTML(stop.cliente)} — ${escapeHTML(stop.endereco)} ${rescheduleBadge}</span><strong>${Number(stop.duracao_atendimento_min || 0)} min</strong></li>`;
+      const technicianActions = state.user.perfil === "tecnico" && plan.status === "publicada"
+        ? `<div class="route-stop-actions">
+            ${stop.status === "pendente" ? `<button type="button" class="quick-action-button" data-action="quick-start-stop" data-plan-id="${plan.id}" data-stop-id="${stop.id}">Iniciar</button>` : ""}
+            ${["pendente", "em_atendimento"].includes(stop.status) ? `<button type="button" class="quick-action-button primary" data-action="quick-finish-stop" data-plan-id="${plan.id}" data-stop-id="${stop.id}">Finalizar</button>` : ""}
+            ${["pendente", "em_atendimento"].includes(stop.status) ? `<button type="button" class="quick-action-button danger" data-action="quick-reschedule-stop" data-plan-id="${plan.id}" data-stop-id="${stop.id}">Não realizada</button>` : ""}
+          </div>`
+        : "";
+      return `<li><span class="route-stop-label">${escapeHTML(stop.cliente)} — ${escapeHTML(stop.endereco)} ${rescheduleBadge}</span>${technicianActions}<strong>${Number(stop.duracao_atendimento_min || 0)} min</strong></li>`;
     }).join("");
     const remaining = stops.length > 4 ? `<li><span>+ ${stops.length - 4} cliente(s)</span><strong>ver detalhes</strong></li>` : "";
     const deleteButton = state.user.perfil === "supervisor"
@@ -587,9 +596,45 @@ function renderPlanCards() {
         <div><span>Tempo total</span><strong>${formatDuration(planTotalDuration(plan))}</strong></div>
       </div>
       <ul class="route-destinations">${destinations || '<li><span>Nenhum cliente adicionado</span><strong>-</strong></li>'}${remaining}</ul>
-      <div class="route-card-actions"><button type="button" data-action="open-plan" data-id="${plan.id}">Detalhes e mapa</button>${deleteButton}</div>
-    </article>`;
-  }).join("");
+       <div class="route-card-actions"><button type="button" data-action="open-plan" data-id="${plan.id}">Abrir mapa</button>${deleteButton}</div>
+     </article>`;
+}
+
+function renderPlanCards() {
+  const container = element("routeCards");
+  const groupByTechnician = state.user.perfil === "supervisor" && !state.lastPlanQuery?.technicianId;
+  container.classList.toggle("is-grouped", groupByTechnician);
+  if (!groupByTechnician) {
+    container.innerHTML = state.plans.map(renderPlanCard).join("");
+    return;
+  }
+  const groups = new Map();
+  state.plans.forEach((plan) => {
+    const name = plan.tecnico_nome || "Técnico sem nome";
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name).push(plan);
+  });
+  container.innerHTML = [...groups.entries()].map(([name, plans]) => `
+    <section class="route-group">
+      <header class="route-group-heading">
+        <div><p class="eyebrow">Técnico externo</p><h3>${escapeHTML(name)}</h3></div>
+        <span class="route-group-count">${plans.length} ${plans.length === 1 ? "rota" : "rotas"}</span>
+      </header>
+      <div class="route-group-cards">${plans.map(renderPlanCard).join("")}</div>
+    </section>`).join("");
+}
+
+function updateDashboardMetrics() {
+  const plans = state.plans;
+  const stops = plans.flatMap((plan) => Array.isArray(plan.paradas) ? plan.paradas : []);
+  const completed = stops.filter((stop) => stop.status === "concluida").length;
+  const inProgress = stops.filter((stop) => stop.status === "em_atendimento").length;
+  const totalDistance = plans.reduce((total, plan) => total + Number(plan.distancia_metros || 0), 0);
+  element("dashboardTotalRoutes").textContent = plans.length;
+  element("dashboardTotalStops").textContent = stops.length;
+  element("dashboardInProgress").textContent = inProgress;
+  element("dashboardCompleted").textContent = completed;
+  element("dashboardDistance").textContent = totalDistance > 0 ? formatDistance(totalDistance) : "-";
 }
 
 function showPlanDashboard() {
@@ -597,12 +642,15 @@ function showPlanDashboard() {
   show("routeWorkspace", false);
   show("emptyRoute", false);
   show("routesDashboard", true);
-  const date = state.lastPlanQuery?.allDates ? "todas as datas" : formatDate(state.lastPlanQuery?.date);
+  const allDates = state.lastPlanQuery?.allDates === true;
+  const date = allDates ? "todas as datas" : formatDate(state.lastPlanQuery?.date);
   const technician = state.user.perfil === "supervisor"
     ? state.technicians.find((item) => String(item.id) === String(state.lastPlanQuery?.technicianId))?.nome
     : state.user.tecnicoNome || state.user.nome;
-  element("routesDashboardTitle").textContent = `${technician || "Técnico"} • ${date}`;
+  element("routesDashboardTitle").textContent = allDates ? "Todas as rotas" : `Rotas de ${date}`;
+  element("dashboardScope").textContent = `${technician || "Todos os técnicos"} • ${date}`;
   element("routesDashboardCount").textContent = `${state.plans.length} ${state.plans.length === 1 ? "rota" : "rotas"}`;
+  updateDashboardMetrics();
   renderPlanCards();
 }
 
@@ -611,7 +659,6 @@ async function loadPlans(options = {}) {
   const date = element("routeDate").value;
   if (!allDates && !date) return toast("Selecione uma data.", "error");
   const technicianId = state.user.perfil === "supervisor" ? element("routeTechnician").value : "";
-  if (state.user.perfil === "supervisor" && !technicianId) return toast("Selecione um técnico.", "error");
   const query = new URLSearchParams();
   if (!allDates) query.set("data", date);
   if (technicianId) query.set("tecnicoId", technicianId);
@@ -675,11 +722,14 @@ async function openPlan(id) {
 }
 
 function showPlanDetail() {
-  renderPlan();
   show("emptyRoute", false);
   show("routesDashboard", false);
   show("routeWorkspace", true);
-  setTimeout(() => state.routeMap.invalidateSize(), 50);
+  renderPlan();
+  setTimeout(() => {
+    state.routeMap?.invalidateSize({ pan: false });
+    renderRouteMap();
+  }, 80);
 }
 
 async function backToRoutes() {
@@ -689,7 +739,9 @@ async function backToRoutes() {
 
 async function deletePlan(id) {
   const plan = state.plans.find((item) => item.id === id) || (state.plan?.id === id ? state.plan : null);
-  if (!window.confirm(`Excluir ${plan?.titulo || "esta rota"} e todas as suas paradas?`)) return;
+  const hasReschedule = plan?.paradas?.some((stop) => stop.reagendada_de_data || stop.reagendada_para || stop.reagendada_de_id || (Array.isArray(stop.historico_reagendamentos) && stop.historico_reagendamentos.length));
+  const warning = hasReschedule ? "\n\nEsta rota contém reagendamentos. A exclusão removerá a rota e os dados das paradas relacionados." : "";
+  if (!window.confirm(`Excluir ${plan?.titulo || "esta rota"} e todas as suas paradas?${warning}`)) return;
   try {
     await request(`/planos/${id}`, { method: "DELETE" });
     state.plans = state.plans.filter((item) => item.id !== id);
@@ -780,23 +832,32 @@ function renderRouteMap() {
   state.routeLayers.clearLayers();
   const plan = state.plan;
   const points = [];
-  const origin = [plan.origem_latitude, plan.origem_longitude];
-  if (origin.every(Number.isFinite)) {
+  const asPoint = (latitude, longitude) => {
+    const point = [Number(latitude), Number(longitude)];
+    return point.every(Number.isFinite) && !(point[0] === 0 && point[1] === 0) ? point : null;
+  };
+  const origin = asPoint(plan.origem_latitude, plan.origem_longitude);
+  if (origin) {
     L.marker(origin).bindPopup(`<strong>Base: ${escapeHTML(plan.origem_nome || "Empresa")}</strong><br>${escapeHTML(plan.origem_endereco || "")}<br>Saída e retorno`).addTo(state.routeLayers);
     points.push(origin);
   }
   plan.paradas.forEach((stop, index) => {
-    const point = [stop.latitude, stop.longitude];
+    const point = asPoint(stop.latitude, stop.longitude);
+    if (!point) return;
     const icon = L.divIcon({ className: "numbered-marker", html: String(index + 1), iconSize: [30, 30], iconAnchor: [15, 15] });
     L.marker(point, { icon }).bindPopup(`<strong>${index + 1}. ${escapeHTML(stop.cliente)}</strong><br>${escapeHTML(stop.endereco)}`).addTo(state.routeLayers);
     points.push(point);
   });
+  let geometryLayer = null;
   if (plan.geometria) {
-    L.geoJSON(plan.geometria, { style: { color: plan.provedor_rota === "estimativa-linear" ? "#64748b" : "#2563eb", weight: 5, opacity: 0.82, dashArray: plan.provedor_rota === "estimativa-linear" ? "8 7" : null } }).addTo(state.routeLayers);
+    geometryLayer = L.geoJSON(plan.geometria, { style: { color: plan.provedor_rota === "estimativa-linear" ? "#64748b" : "#2563eb", weight: 5, opacity: 0.82, dashArray: plan.provedor_rota === "estimativa-linear" ? "8 7" : null } }).addTo(state.routeLayers);
   } else if (points.length > 1) {
-    L.polyline([...points, origin], { color: "#94a3b8", weight: 3, dashArray: "7 7" }).addTo(state.routeLayers);
+    L.polyline(origin ? [...points, origin] : points, { color: "#94a3b8", weight: 3, dashArray: "7 7" }).addTo(state.routeLayers);
   }
-  if (points.length) state.routeMap.fitBounds(L.latLngBounds(points).pad(0.18), { maxZoom: 15 });
+  if (points.length > 1) state.routeMap.fitBounds(L.latLngBounds(points).pad(0.18), { maxZoom: 15 });
+  else if (points.length === 1) state.routeMap.setView(points[0], 15);
+  else if (geometryLayer?.getBounds().isValid()) state.routeMap.fitBounds(geometryLayer.getBounds().pad(0.18), { maxZoom: 15 });
+  else state.routeMap.setView(DEFAULT_CENTER, 12);
 }
 
 function googleNavigationUrl(stop) {
@@ -870,7 +931,10 @@ async function saveStop(event) {
 function editStop(id) { openStopForm(state.plan.paradas.find((stop) => stop.id === id)); }
 
 async function removeStop(id) {
-  if (!window.confirm("Excluir esta parada da rota?")) return;
+  const stop = state.plan?.paradas.find((item) => item.id === id);
+  const hasReschedule = stop?.reagendada_de_data || stop?.reagendada_para || stop?.reagendada_de_id || (Array.isArray(stop?.historico_reagendamentos) && stop.historico_reagendamentos.length);
+  const warning = hasReschedule ? "\n\nEsta parada possui histórico de reagendamento e seus registros serão removidos." : "";
+  if (!window.confirm(`Excluir esta parada da rota?${warning}`)) return;
   try {
     await request(`/planos/${state.plan.id}/paradas/${id}`, { method: "DELETE" });
     state.plan.paradas = state.plan.paradas
@@ -926,6 +990,25 @@ async function updateStopStatus(id, status) {
   } catch (error) { toast(error.message, "error"); }
 }
 
+async function quickStartStop(planId, stopId) {
+  try {
+    await request(`/planos/${planId}/paradas/${stopId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "em_atendimento" }),
+    });
+    toast("Atendimento iniciado.");
+    await loadPlans({ allDates: state.lastPlanQuery?.allDates === true });
+  } catch (error) { toast(error.message, "error"); }
+}
+
+async function quickOpenStopStatus(planId, stopId, status) {
+  try {
+    state.plan = await request(`/planos/${planId}`);
+    state.quickStatusContext = { allDates: state.lastPlanQuery?.allDates === true };
+    openStopStatusModal(stopId, status);
+  } catch (error) { toast(error.message, "error"); }
+}
+
 function nextDateAfter(value) {
   const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
   date.setDate(date.getDate() + 1);
@@ -959,6 +1042,7 @@ function openStopStatusModal(id, status) {
 function closeStopStatusModal() {
   show("stopStatusModal", false);
   element("stopStatusForm").reset();
+  state.quickStatusContext = null;
 }
 
 async function submitStopStatus(event) {
@@ -968,6 +1052,7 @@ async function submitStopStatus(event) {
   const button = element("confirmStopStatusButton");
   const payload = { status, motivo: element("statusReason").value };
   if (status === "nao_realizada") payload.reagendarPara = element("rescheduleDate").value;
+  const quickStatusContext = state.quickStatusContext;
   setBusy(button, true, status === "nao_realizada" ? "Reagendando..." : "Concluindo...");
   try {
     const response = await request(`/planos/${state.plan.id}/paradas/${id}/status`, {
@@ -979,6 +1064,12 @@ async function submitStopStatus(event) {
       state.plan = null;
       await loadPlans({ allDates: true });
       toast(`A mesma visita foi movida para ${formatDate(response.reagendamento.data)}, mantendo o motivo e o histórico. O ADM já pode revisar e publicar a rota.`);
+      return;
+    }
+    if (quickStatusContext) {
+      state.plan = null;
+      await loadPlans({ allDates: quickStatusContext.allDates });
+      toast(status === "concluida" ? "Visita finalizada." : "Visita atualizada.");
       return;
     }
     const previousStop = state.plan.paradas.find((stop) => stop.id === id) || {};
@@ -1012,6 +1103,9 @@ function handleDelegatedAction(event) {
     "remove-stop": () => removeStop(id),
     "update-stop-status": () => updateStopStatus(id, button.dataset.status),
     "open-stop-status": () => openStopStatusModal(id, button.dataset.status),
+    "quick-start-stop": () => quickStartStop(Number(button.dataset.planId), Number(button.dataset.stopId)),
+    "quick-finish-stop": () => quickOpenStopStatus(Number(button.dataset.planId), Number(button.dataset.stopId), "concluida"),
+    "quick-reschedule-stop": () => quickOpenStopStatus(Number(button.dataset.planId), Number(button.dataset.stopId), "nao_realizada"),
   };
   actions[button.dataset.action]?.();
 }
@@ -1026,16 +1120,7 @@ function bindEvents() {
   element("loadRoutesButton").addEventListener("click", () => loadPlans());
   element("showAllRoutesButton").addEventListener("click", () => loadPlans({ allDates: true }));
   element("routeTechnician").addEventListener("change", () => {
-    if (element("routeTechnician").value) loadPlans({ allDates: true });
-    else {
-      planLoadSequence += 1;
-      setBusy(element("loadRoutesButton"), false);
-      state.plans = [];
-      show("routesDashboard", false);
-      show("routeWorkspace", false);
-      show("emptyRoute", true);
-      element("emptyRouteText").textContent = "Selecione um técnico para visualizar as rotas.";
-    }
+    loadPlans();
   });
   element("createRouteButton").addEventListener("click", createPlan);
   element("backToRoutesButton").addEventListener("click", backToRoutes);

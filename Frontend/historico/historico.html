@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico?v=3" type="image/x-icon" />
     <title>Histórico - Conecta</title>
-    <link rel="stylesheet" href="historico.css" />
+    <link rel="stylesheet" href="historico.css?v=1.2.0" />
   </head>
 
   <body>
@@ -14,9 +14,8 @@
         <div>
           <span class="eyebrow">Relatórios</span>
           <h1>Histórico completo</h1>
-          <p>Consulte treinamentos, puladas e manutenções registradas.</p>
         </div>
-        <button class="voltar" onclick="window.location.href = '../index.html'">← Voltar</button>
+        <button class="voltar" onclick="window.location.href = '../index.html'">← Início</button>
       </header>
 
       <section class="cards" aria-label="Resumo do histórico">
@@ -55,17 +54,16 @@
         </div>
 
         <div class="acoes-historico">
-          <button class="btn-treinamentos" onclick="baixarCSV('treinamentos')">CSV Treinamentos</button>
-          <button class="btn-puladas" onclick="baixarCSV('puladas')">CSV Puladas</button>
-          <button class="btn-manutencao" onclick="baixarCSV('manutencao')">CSV Manutenção</button>
-          <button class="btn-treinamentos" onclick="baixarExcel()">Baixar Excel</button>
+          <button class="btn-treinamentos" onclick="baixarCSV('treinamentos')">CSV treinamento</button>
+          <button class="btn-puladas" onclick="baixarCSV('puladas')">CSV puladas</button>
+          <button class="btn-manutencao" onclick="baixarCSV('manutencao')">CSV manutenção</button>
+          <button class="btn-treinamentos" onclick="baixarExcel()">Excel</button>
         </div>
       </section>
 
       <section class="secao">
         <div class="secao-header">
           <h2>Treinamentos</h2>
-          <span>Atendimentos realizados</span>
         </div>
         <div class="table-wrapper">
           <table>
@@ -83,12 +81,16 @@
             </tbody>
           </table>
         </div>
+        <div class="pagination" data-pagination="treinamentos" aria-label="Paginação de treinamentos">
+          <button type="button" class="page-button" data-page-action="prev" data-page-type="treinamentos" title="Página anterior" aria-label="Página anterior">←</button>
+          <span id="paginaTreinamentos">0–0 de 0</span>
+          <button type="button" class="page-button" data-page-action="next" data-page-type="treinamentos" title="Próxima página" aria-label="Próxima página">→</button>
+        </div>
       </section>
 
       <section class="secao">
         <div class="secao-header">
           <h2>Puladas</h2>
-          <span>Chamadas puladas com motivo</span>
         </div>
         <div class="table-wrapper">
           <table>
@@ -104,12 +106,16 @@
             </tbody>
           </table>
         </div>
+        <div class="pagination" data-pagination="puladas" aria-label="Paginação de puladas">
+          <button type="button" class="page-button" data-page-action="prev" data-page-type="puladas" title="Página anterior" aria-label="Página anterior">←</button>
+          <span id="paginaPuladas">0–0 de 0</span>
+          <button type="button" class="page-button" data-page-action="next" data-page-type="puladas" title="Próxima página" aria-label="Próxima página">→</button>
+        </div>
       </section>
 
       <section class="secao">
         <div class="secao-header">
           <h2>Manutenção</h2>
-          <span>Equipamentos registrados</span>
         </div>
         <div class="table-wrapper">
           <table>
@@ -125,9 +131,14 @@
             </tbody>
           </table>
         </div>
+        <div class="pagination" data-pagination="manutencao" aria-label="Paginação de manutenção">
+          <button type="button" class="page-button" data-page-action="prev" data-page-type="manutencao" title="Página anterior" aria-label="Página anterior">←</button>
+          <span id="paginaManutencao">0–0 de 0</span>
+          <button type="button" class="page-button" data-page-action="next" data-page-type="manutencao" title="Próxima página" aria-label="Próxima página">→</button>
+        </div>
       </section>
     </div>
 
-    <script src="historico.js"></script>
+    <script src="historico.js?v=1.3.0"></script>
   </body>
 </html>

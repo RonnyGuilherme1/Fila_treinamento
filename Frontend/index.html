@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico?v=3" type="image/x-icon" />
     <title>Conecta - Controle</title>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=1.4.0" />
   </head>
 
   <body>
@@ -13,29 +13,32 @@
       <aside class="sidebar">
         <div class="brand">
           <img class="brand-logo" src="/conectapc-logo.png?v=1" alt="" />
-          <div><strong>Conecta</strong><span>Controle de filas</span></div>
+          <div><strong>Conecta</strong></div>
         </div>
 
         <nav class="menu" aria-label="Navegação principal">
+          <div class="menu-label">Operação</div>
           <button class="nav-button active" data-tab="treinamento" onclick="trocarAba('treinamento')">
-            <span>Treinamento</span>
+            <span class="nav-icon" aria-hidden="true">T</span><span class="nav-copy"><strong>Treinamento</strong></span>
           </button>
           <button class="nav-button" data-tab="manutencao" onclick="trocarAba('manutencao')">
-            <span>Manutenção</span>
+            <span class="nav-icon" aria-hidden="true">M</span><span class="nav-copy"><strong>Manutenção</strong></span>
           </button>
+          <div class="menu-label menu-label-spaced">Gestão</div>
           <button class="nav-button" data-tab="configuracoes" onclick="trocarAba('configuracoes')">
-            <span>Configurações</span>
+            <span class="nav-icon" aria-hidden="true">C</span><span class="nav-copy"><strong>Configurações</strong></span>
           </button>
           <button class="nav-button" onclick="abrirRotasExternas()">
-            <span>Rotas externas</span>
+            <span class="nav-icon" aria-hidden="true">R</span><span class="nav-copy"><strong>Rotas externas</strong></span>
           </button>
           <button class="nav-button" onclick="window.location.href = 'historico/historico.html'">
-            <span>Histórico</span>
+            <span class="nav-icon" aria-hidden="true">H</span><span class="nav-copy"><strong>Histórico</strong></span>
           </button>
           <button class="nav-button" onclick="window.open('tv/tv.html')">
-            <span>Painel TV</span>
+            <span class="nav-icon" aria-hidden="true">TV</span><span class="nav-copy"><strong>Painel TV</strong></span>
           </button>
         </nav>
+        <div class="sidebar-footer"><span class="status-dot" aria-hidden="true"></span><strong>Online</strong></div>
       </aside>
 
       <main class="content">
@@ -45,7 +48,7 @@
             <h1 id="titulo">Treinamento</h1>
           </div>
           <div class="page-header-info">
-            <p>Controle simples para chamada, atendimento e histórico da equipe.</p>
+            <span class="live-status"><i aria-hidden="true"></i> Online</span>
             <span id="ultimaAtualizacao" class="last-updated">Atualizado às --:--</span>
           </div>
         </header>
@@ -67,6 +70,7 @@
                   <span>Próximo da fila</span>
                   <p id="proximoTreinamento" class="proximo-nome">-</p>
                 </div>
+                <span class="metric-icon" aria-hidden="true">01</span>
               </div>
               <div class="fila-completa">
                 <p class="fila-indicator">Fila completa</p>
@@ -80,6 +84,7 @@
           </div>
 
           <div class="acao card-action">
+            <div class="action-heading"><span class="action-icon" aria-hidden="true">+</span><strong>Novo atendimento</strong></div>
             <div class="field-group field-grow">
               <label for="clienteTreinamento">Cliente</label>
               <input id="clienteTreinamento" placeholder="Nome do cliente" maxlength="120" autocomplete="off" />
@@ -98,11 +103,10 @@
             <button id="btnAtualizarTreinamento" class="secondary" onclick="atualizar('btnAtualizarTreinamento')">Atualizar</button>
           </div>
 
-          <div class="grid">
+          <div class="grid dashboard-grid">
             <div class="box full-width-box">
               <div class="box-header">
                 <h3>Histórico recente</h3>
-                <span>Últimos atendimentos</span>
               </div>
               <div class="scroll">
                 <table>
@@ -120,9 +124,10 @@
                 </table>
               </div>
 
-              <div class="box-header ranking-header">
+            </div>
+            <div class="box ranking-box">
+              <div class="box-header">
                 <h3>Ranking</h3>
-                <span>Quantidade por pessoa</span>
               </div>
               <div class="scroll small-scroll">
                 <table>
@@ -148,6 +153,7 @@
                   <span>Próximo da fila</span>
                   <p id="proximoManutencao" class="proximo-nome">-</p>
                 </div>
+                <span class="metric-icon metric-icon-blue" aria-hidden="true">MT</span>
               </div>
               <div class="fila-completa">
                 <p class="fila-indicator">Fila completa</p>
@@ -161,6 +167,7 @@
           </div>
 
           <div class="acao card-action">
+            <div class="action-heading"><span class="action-icon action-icon-blue" aria-hidden="true">+</span><strong>Registrar manutenção</strong></div>
             <div class="field-group field-grow">
               <label for="equipamento">Equipamento</label>
               <input id="equipamento" placeholder="Nº do equipamento" inputmode="numeric" maxlength="80" autocomplete="off" />
@@ -174,7 +181,6 @@
             <div class="box full-width-box">
               <div class="box-header">
                 <h3>Histórico recente</h3>
-                <span>Últimas manutenções</span>
               </div>
               <div class="scroll">
                 <table>
@@ -198,7 +204,6 @@
             <div class="box config-box">
               <div class="box-header">
                 <h3>Fila de treinamento</h3>
-                <span>Técnicos da fila</span>
               </div>
               <div class="config-form">
                 <input id="novoTecnicoTreinamento" placeholder="Nome do técnico" maxlength="100" autocomplete="off" />
@@ -222,7 +227,6 @@
             <div class="box config-box">
               <div class="box-header">
                 <h3>Fila de manutenção</h3>
-                <span>Técnicos da fila</span>
               </div>
               <div class="config-form">
                 <input id="novoTecnicoManutencao" placeholder="Nome do técnico" maxlength="100" autocomplete="off" />
@@ -273,6 +277,6 @@
       </div>
     </div>
 
-    <script src="script.js?v=1.0.7"></script>
+    <script src="script.js?v=1.4.0"></script>
   </body>
 </html>

@@ -9,6 +9,19 @@ const API = (() => {
   return "https://fila-treinamento.onrender.com";
 })();
 
+const PAGE_SIZE = 10;
+const historicoState = {
+  treinamentos: [],
+  puladas: [],
+  manutencao: [],
+  ranking: [],
+  paginas: {
+    treinamentos: 1,
+    puladas: 1,
+    manutencao: 1,
+  },
+};
+
 function escapeHTML(valor) {
   return String(valor ?? "")
     .replace(/&/g, "&amp;")
@@ -98,7 +111,7 @@ function setTexto(id, valor) {
 function renderTreinamentos(lista) {
   if (!lista.length) return `<tr><td colspan="5" class="empty-cell">Nenhum treinamento encontrado.</td></tr>`;
 
-  return lista
+  return lista.slice(0, PAGE_SIZE)
     .map(
       (h) => `
         <tr>
@@ -116,7 +129,7 @@ function renderTreinamentos(lista) {
 function renderPuladas(lista) {
   if (!lista.length) return `<tr><td colspan="3" class="empty-cell">Nenhuma chamada pulada encontrada.</td></tr>`;
 
-  return lista
+  return lista.slice(0, PAGE_SIZE)
     .map(
       (h) => `
         <tr>
@@ -132,7 +145,7 @@ function renderPuladas(lista) {
 function renderManutencao(lista) {
   if (!lista.length) return `<tr><td colspan="3" class="empty-cell">Nenhuma manutenção encontrada.</td></tr>`;
 
-  return lista
+  return lista.slice(0, PAGE_SIZE)
     .map(
       (h) => `
         <tr>
@@ -145,6 +158,40 @@ function renderManutencao(lista) {
     .join("");
 }
 
+function totalPaginas(tipo) {
+  return Math.max(1, Math.ceil((historicoState[tipo] || []).length / PAGE_SIZE));
+}
+
+function renderPagina(tipo) {
+  const paginaAtual = Math.min(historicoState.paginas[tipo] || 1, totalPaginas(tipo));
+  historicoState.paginas[tipo] = paginaAtual;
+  const inicio = (paginaAtual - 1) * PAGE_SIZE;
+  const pagina = (historicoState[tipo] || []).slice(inicio, inicio + PAGE_SIZE);
+  const renderizadores = {
+    treinamentos: renderTreinamentos,
+    puladas: renderPuladas,
+    manutencao: renderManutencao,
+  };
+  const tbody = document.getElementById(`tb${tipo.charAt(0).toUpperCase()}${tipo.slice(1)}`);
+  if (tbody) tbody.innerHTML = renderizadores[tipo](pagina);
+
+  const total = (historicoState[tipo] || []).length;
+  const fim = Math.min(inicio + PAGE_SIZE, total);
+  const indicador = document.getElementById(`pagina${tipo.charAt(0).toUpperCase()}${tipo.slice(1)}`);
+  if (indicador) indicador.textContent = total ? `${inicio + 1}–${fim} de ${total}` : "0–0 de 0";
+
+  const paginacao = document.querySelector(`[data-pagination="${tipo}"]`);
+  paginacao?.querySelector('[data-page-action="prev"]')?.toggleAttribute("disabled", paginaAtual <= 1);
+  paginacao?.querySelector('[data-page-action="next"]')?.toggleAttribute("disabled", paginaAtual >= totalPaginas(tipo));
+}
+
+function mudarPagina(tipo, delta) {
+  const proxima = (historicoState.paginas[tipo] || 1) + delta;
+  if (proxima < 1 || proxima > totalPaginas(tipo)) return;
+  historicoState.paginas[tipo] = proxima;
+  renderPagina(tipo);
+}
+
 async function carregarHistorico() {
   try {
     const data = await requestJSON(montarEndpointHistorico("/historico/completo"));
@@ -154,9 +201,17 @@ async function carregarHistorico() {
     const manutencao = data.manutencao || [];
     const ranking = data.ranking || [];
 
-    document.getElementById("tbTreinamentos").innerHTML = renderTreinamentos(treinamentos);
-    document.getElementById("tbPuladas").innerHTML = renderPuladas(puladas);
-    document.getElementById("tbManutencao").innerHTML = renderManutencao(manutencao);
+    historicoState.treinamentos = treinamentos;
+    historicoState.puladas = puladas;
+    historicoState.manutencao = manutencao;
+    historicoState.ranking = ranking;
+    historicoState.paginas.treinamentos = 1;
+    historicoState.paginas.puladas = 1;
+    historicoState.paginas.manutencao = 1;
+
+    renderPagina("treinamentos");
+    renderPagina("puladas");
+    renderPagina("manutencao");
 
     setTexto("totalTreinamentos", treinamentos.length);
     setTexto("totalPuladas", puladas.length);
@@ -202,20 +257,16 @@ function baixarCSV(tipo) {
 
   if (!config) return;
 
-  const tabela = document.getElementById(config.id);
-  if (!tabela) return;
-
   const linhas = [config.cabecalhos.map(escaparCSV).join(";")];
+  const registros = historicoState[tipo] || [];
 
-  tabela.querySelectorAll("tr").forEach((row) => {
-    const cols = row.querySelectorAll("td");
-    if (cols.length !== config.cabecalhos.length || row.querySelector(".empty-cell")) return;
-
-    const linha = [...cols]
-      .map((c) => escaparCSV(c.innerText))
-      .join(";");
-
-    linhas.push(linha);
+  registros.forEach((item) => {
+    const valores = tipo === "treinamentos"
+      ? [item.pessoa, item.cliente, item.tipo, formatarData(item.data_inicio), formatarDuracao(item.data_inicio, item.data_fim)]
+      : tipo === "puladas"
+        ? [item.pessoa, item.motivo, formatarData(item.data_inicio)]
+        : [item.pessoa, item.equipamento, formatarData(item.data)];
+    linhas.push(valores.map(escaparCSV).join(";"));
   });
 
   const blob = new Blob([`\ufeff${linhas.join("\r\n")}`], { type: "text/csv;charset=utf-8;" });
@@ -228,5 +279,11 @@ function baixarCSV(tipo) {
   URL.revokeObjectURL(link.href);
   link.remove();
 }
+
+document.querySelectorAll("[data-page-action]").forEach((button) => {
+  button.addEventListener("click", () => {
+    mudarPagina(button.dataset.pageType, button.dataset.pageAction === "next" ? 1 : -1);
+  });
+});
 
 carregarHistorico();

@@ -1,8 +1,8 @@
-const CACHE_NAME = "conecta-rotas-v3";
+const CACHE_NAME = "conecta-rotas-v5";
 const APP_SHELL = [
   "/rotas/rotas.html",
-  "/rotas/rotas.css?v=1.3.0",
-  "/rotas/rotas.js?v=1.3.0",
+  "/rotas/rotas.css?v=1.5.0",
+  "/rotas/rotas.js?v=1.6.0",
   "/vendor/leaflet/leaflet.css?v=1.9.4",
   "/vendor/leaflet/leaflet.js?v=1.9.4",
   "/conectapc-logo.png?v=1",

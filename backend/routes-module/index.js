@@ -400,21 +400,6 @@ function createRoutesRouter(pool) {
   router.delete("/planos/:id", auth.requireSupervisor, auth.requireCsrf, asyncRoute(async (req, res) => {
     const id = positiveId(req.params.id);
     await getPlan(pool, id, req.routeUser);
-    const reschedules = await pool.query(
-      `SELECT EXISTS (
-         SELECT 1 FROM rotas_paradas rp
-         WHERE rp.plano_id = $1
-           AND (rp.reagendada_de_id IS NOT NULL
-             OR JSONB_ARRAY_LENGTH(COALESCE(rp.historico_reagendamentos, '[]'::jsonb)) > 0
-             OR EXISTS (
-             SELECT 1 FROM rotas_paradas destino WHERE destino.reagendada_de_id = rp.id
-           ))
-       ) AS possui`,
-      [id],
-    );
-    if (reschedules.rows[0].possui) {
-      throw httpError("Esta rota possui historico de reagendamento e nao pode ser excluida.", 409);
-    }
     await pool.query("DELETE FROM rotas_planos WHERE id = $1", [id]);
     res.status(204).end();
   }));
@@ -476,21 +461,6 @@ function createRoutesRouter(pool) {
     const planId = positiveId(req.params.planId);
     const stopId = positiveId(req.params.stopId);
     await getPlan(pool, planId, req.routeUser);
-    const reschedules = await pool.query(
-      `SELECT EXISTS (
-         SELECT 1 FROM rotas_paradas rp
-         WHERE rp.id = $1 AND rp.plano_id = $2
-           AND (rp.reagendada_de_id IS NOT NULL
-             OR JSONB_ARRAY_LENGTH(COALESCE(rp.historico_reagendamentos, '[]'::jsonb)) > 0
-             OR EXISTS (
-             SELECT 1 FROM rotas_paradas destino WHERE destino.reagendada_de_id = rp.id
-           ))
-       ) AS possui`,
-      [stopId, planId],
-    );
-    if (reschedules.rows[0].possui) {
-      throw httpError("Esta parada possui historico de reagendamento e nao pode ser excluida.", 409);
-    }
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
