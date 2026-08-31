@@ -332,30 +332,25 @@ textarea {
   box-shadow: none;
 }
 
-.nav-item::before {
+.nav-item-icon {
   width: 34px;
   height: 34px;
   display: grid;
   place-items: center;
-  content: "P";
   color: #dcfce7;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.17);
   border-radius: 11px;
-  font-size: 0.76rem;
-  font-weight: 900;
 }
 
-.nav-item[data-panel="tecnicos"]::before {
-  content: "T";
-}
-
-.nav-item[data-panel="usuarios"]::before {
-  content: "U";
-}
-
-.nav-item[data-panel="configuracao"]::before {
-  content: "B";
+.nav-item-svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .nav-item:hover,
