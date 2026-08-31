@@ -21,6 +21,17 @@ ambiente e o servico pode ser reiniciado.
 O modulo protegido deve ser aberto pelo mesmo dominio do backend (ou por um
 proxy reverso no mesmo dominio), pois a sessao usa cookie HttpOnly e SameSite.
 
+## Instalar no celular sem APK
+
+O modulo e uma PWA e pode ser instalado diretamente pelo navegador, sem liberar
+APK de fonte externa. No Android, abra `/rotas/rotas.html` no Chrome e use o
+aviso `Instale o Conecta Rotas`. Se a confirmacao automatica nao estiver
+disponivel, use o menu de tres pontos, `Adicionar a tela inicial` e `Instalar`.
+
+Depois de instalado, o modulo abre em uma janela propria e recebe as atualizacoes
+publicadas no sistema web. A interface basica fica em cache, mas login, mapas,
+rotas e alteracoes de atendimento continuam precisando de internet.
+
 ## Mapa e calculo viario
 
 Sem configuracao externa, o mapa e o planejamento funcionam e a opcao Otimizar

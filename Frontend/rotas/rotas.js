@@ -22,6 +22,7 @@ const state = {
 let activeRequests = 0;
 let loadingTimer = null;
 let planLoadSequence = 0;
+let deferredInstallPrompt = null;
 
 function element(id) { return document.getElementById(id); }
 function show(id, visible = true) { element(id)?.classList.toggle("hidden", !visible); }
@@ -85,6 +86,79 @@ function toast(message, type = "success") {
   item.textContent = message;
   element("toastRegion").appendChild(item);
   setTimeout(() => item.remove(), 3800);
+}
+
+function isInstalledApp() {
+  return window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+}
+
+function isMobileBrowser() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+function showInstallBanner(fallback = false) {
+  if (isInstalledApp()) return show("installBanner", false);
+  element("installBannerText").textContent = fallback
+    ? "Adicione o sistema à tela inicial pelo menu do navegador."
+    : "Coloque o sistema na tela inicial e abra como aplicativo.";
+  element("installAppButton").textContent = fallback ? "Como instalar" : "Instalar";
+  show("installBanner", true);
+}
+
+function installInstructions() {
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    return "Abra esta página no Safari, toque em Compartilhar e depois em Adicionar à Tela de Início.";
+  }
+  return "No Chrome, toque no menu de três pontos, escolha Adicionar à tela inicial e depois Instalar. Isso não baixa um APK externo.";
+}
+
+function openInstallHelp() {
+  element("installHelpText").textContent = installInstructions();
+  show("installHelpModal", true);
+}
+
+async function requestAppInstall() {
+  if (!deferredInstallPrompt) return openInstallHelp();
+  const promptEvent = deferredInstallPrompt;
+  deferredInstallPrompt = null;
+  try {
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
+    if (choice.outcome === "accepted") {
+      show("installBanner", false);
+      toast("Conecta Rotas instalado na tela inicial.");
+    } else {
+      showInstallBanner(true);
+    }
+  } catch (_error) {
+    showInstallBanner(true);
+    openInstallHelp();
+  }
+}
+
+function initializeAppInstall() {
+  if (isInstalledApp()) return;
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    showInstallBanner(false);
+  });
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    show("installBanner", false);
+  });
+  element("installAppButton").addEventListener("click", requestAppInstall);
+  element("dismissInstallButton").addEventListener("click", () => show("installBanner", false));
+  element("closeInstallHelpButton").addEventListener("click", () => show("installHelpModal", false));
+  element("installHelpModal").addEventListener("click", (event) => {
+    if (event.target === element("installHelpModal")) show("installHelpModal", false);
+  });
+  if (isMobileBrowser()) {
+    window.setTimeout(() => {
+      if (!deferredInstallPrompt && !isInstalledApp()) showInstallBanner(true);
+    }, 1800);
+  }
 }
 
 function setBusy(button, busy, text = "Aguarde...") {
@@ -996,6 +1070,7 @@ function bindEvents() {
 
 bindEvents();
 updateUserRoleForm();
+initializeAppInstall();
 checkSession();
 
 if ("serviceWorker" in navigator) {

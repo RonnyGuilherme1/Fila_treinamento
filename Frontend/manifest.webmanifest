@@ -11,6 +11,7 @@
   "theme_color": "#102b1c",
   "lang": "pt-BR",
   "categories": ["business", "productivity", "navigation"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/conecta-192.png",

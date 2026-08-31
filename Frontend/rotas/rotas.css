@@ -58,6 +58,56 @@ body {
   }
 }
 
+.install-banner {
+  position: fixed;
+  z-index: 1800;
+  right: 18px;
+  bottom: 18px;
+  width: min(520px, calc(100% - 36px));
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #bbf7d0;
+  border-radius: 15px;
+  box-shadow: 0 18px 50px rgba(16, 24, 40, 0.2);
+}
+
+.install-banner img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.install-banner div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.install-banner strong {
+  color: #14532d;
+}
+
+.install-banner span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.install-banner button {
+  padding: 9px 13px;
+}
+
+.install-banner .install-dismiss {
+  color: #475467;
+  background: transparent;
+  font-size: 0.75rem;
+}
+
 button,
 input,
 textarea,
@@ -1140,6 +1190,10 @@ tr:last-child td {
   margin: -6px 0 0;
 }
 
+.install-help-card h2 {
+  margin: 2px 0 14px;
+}
+
 .modal-copy {
   margin: -7px 0 2px;
   color: var(--muted);
@@ -1342,6 +1396,37 @@ tr:last-child td {
 }
 
 @media (max-width: 420px) {
+  .install-banner {
+    right: 10px;
+    bottom: 10px;
+    width: calc(100% - 20px);
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: 9px;
+  }
+
+  .install-banner img {
+    width: 42px;
+    height: 42px;
+  }
+
+  .install-banner #installAppButton {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .install-banner .install-dismiss {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 6px;
+    font-size: 0;
+  }
+
+  .install-banner .install-dismiss::after {
+    content: "×";
+    font-size: 1.25rem;
+  }
+
   .content {
     padding: 10px;
   }
